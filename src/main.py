@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from src.routes.work_orders import router as work_orders_router
+from src.routes.sync import router as sync_router
+from src.routes.websocket import router as websocket_router
 
 load_dotenv()
 
@@ -67,6 +69,8 @@ from fastapi.staticfiles import StaticFiles
 
 # Register routers
 app.include_router(work_orders_router, prefix="/api/v1")
+app.include_router(sync_router, prefix="/api/v1")
+app.include_router(websocket_router)
 
 
 @app.get("/api/v1/health", status_code=status.HTTP_200_OK)
