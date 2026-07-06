@@ -1,18 +1,18 @@
 # T002 — Mock Data Source & REST APIs
 
 ## Status
-- [ ] Pending  /  [ ] In Progress  /  [ ] ✅ Completed
+- [ ] Pending  /  [ ] In Progress  /  [x] ✅ Completed
 
 ## Description
 Develop the mock data models for work orders and inspections. Expose REST endpoints to list and retrieve work orders.
 
 ## Acceptance Criteria (DoD)
-- [ ] Implement synthetic data generator representing at least 3 work orders with specific fields (ID, address, model, expected MAC vendor prefix, status).
-- [ ] Expose `GET /api/v1/work-orders` with status parameter filtering.
-- [ ] Expose `GET /api/v1/work-orders/{id}` returning full work order details or `404 NOT_FOUND` for invalid IDs.
-- [ ] Endpoints require and validate Bearer Authorization tokens (mock check: accept any string payload in headers starting with `Bearer `).
-- [ ] Error responses strictly conform to the `ErrorResponse` schema in `API_SPEC.md` if authentication or route validation fails.
-- [ ] Integration tests verify response formats and status code assertions.
+- [x] Implement synthetic data generator representing at least 3 work orders with specific fields (ID, address, model, expected MAC vendor prefix, status).
+- [x] Expose `GET /api/v1/work-orders` with status parameter filtering.
+- [x] Expose `GET /api/v1/work-orders/{id}` returning full work order details or `404 NOT_FOUND` for invalid IDs.
+- [x] Endpoints require and validate Bearer Authorization tokens (mock check: accept any string payload in headers starting with `Bearer `).
+- [x] Error responses strictly conform to the `ErrorResponse` schema in `API_SPEC.md` if authentication or route validation fails.
+- [x] Integration tests verify response formats and status code assertions.
 
 ## Dependencies
 - `T001 — Setup & Project Scaffold`
@@ -34,5 +34,11 @@ Develop the mock data models for work orders and inspections. Expose REST endpoi
 
 ## Implementation Notes
 - Files created:
+  - `src/models/work_order.py`
+  - `src/routes/work_orders.py`
+  - `tests/test_work_orders.py`
 - Tests added:
+  - `tests/test_work_orders.py` (6 test cases checking list, retrieve, mock auth, filters, error payload format)
 - Notes:
+  - Global custom exception handlers registered in `src/main.py` to intercept HTTPExceptions and RequestValidationErrors, translating them into the standard `ErrorResponse` payload.
+  - Used `enum.Enum` to enforce strict query parameter validation for the status filter.

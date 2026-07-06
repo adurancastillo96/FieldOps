@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FieldOps — Inspección de Fibra FTTH</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <div class="app-container">
+        <!-- Top Navigation Header -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="logo-icon">⚡</span>
+                <h1>FieldOps</h1>
+                <span class="version-badge">v0.1.0 (Hackathon)</span>
+            </div>
+            
+            <div class="header-controls">
+                <div class="network-badge online" id="network-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Conectado (Nube)</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btn-sync-queue">
+                    🔄 Sincronizar Cola <span class="badge" id="sync-queue-count">0</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Work Area -->
+        <main class="main-layout">
+            <!-- Left Panel: Work Orders & Steps Workflow -->
+            <section class="panel-card workflow-panel">
+                <div class="panel-header">
+                    <h2>📋 Orden de Trabajo</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="wo-select-container">
+                        <label for="wo-select">Seleccionar Orden:</label>
+                        <select id="wo-select" class="form-select">
+                            <option value="">-- Cargar orden de trabajo --</option>
+                        </select>
+                    </div>
+
+                    <div id="wo-details-card" class="wo-details-card hidden">
+                        <div class="wo-info-row">
+                            <span class="label">Dirección:</span>
+                            <span class="value" id="wo-address">-</span>
+                        </div>
+                        <div class="wo-info-row">
+                            <span class="label">ONT Modelo:</span>
+                            <span class="value" id="wo-model">-</span>
+                        </div>
+                        <div class="wo-info-row">
+                            <span class="label">Prefijo MAC:</span>
+                            <span class="value" id="wo-mac-prefix">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Steps Timeline -->
+                    <div class="workflow-steps-container">
+                        <h3>Pasos de Inspección</h3>
+                        <div class="steps-timeline" id="steps-timeline">
+                            <div class="step-placeholder">Seleccione una orden de trabajo para ver los pasos de inspección.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Center Panel: Live Camera & Edge AI QA -->
+            <section class="panel-card camera-panel">
+                <div class="panel-header">
+                    <h2>📷 Captura de Evidencia</h2>
+                    <span id="active-step-title" class="active-step-title">Sin paso activo</span>
+                </div>
+                <div class="panel-body camera-body">
+                    <div class="viewfinder-container">
+                        <video id="viewfinder" autoplay playsinline muted class="viewfinder"></video>
+                        <canvas id="viewfinder-canvas" class="viewfinder-canvas hidden"></canvas>
+                        
+                        <!-- Semi-transparent overlay guidelines -->
+                        <div class="camera-guideline" id="camera-guideline">
+                            <div class="guideline-box"></div>
+                        </div>
+
+                        <div class="capture-overlay" id="capture-overlay">
+                            <span class="overlay-instruction">Alinee el dispositivo con el cuadro</span>
+                        </div>
+                    </div>
+
+                    <div class="camera-controls">
+                        <button class="btn btn-primary btn-lg btn-round" id="btn-capture" disabled>
+                            📸 Capturar
+                        </button>
+                        <button class="btn btn-secondary btn-lg btn-round hidden" id="btn-retake">
+                            🔄 Repetir
+                        </button>
+                    </div>
+
+                    <!-- Edge QA Scores Grid -->
+                    <div class="qa-results-container hidden" id="qa-results-container">
+                        <h4>Resultados de Calidad (Edge AI)</h4>
+                        <div class="qa-grid">
+                            <div class="qa-item" id="qa-blur">
+                                <span class="qa-label">Nitidez:</span>
+                                <span class="qa-status">-</span>
+                            </div>
+                            <div class="qa-item" id="qa-exposure">
+                                <span class="qa-label">Exposición:</span>
+                                <span class="qa-status">-</span>
+                            </div>
+                            <div class="qa-item" id="qa-framing">
+                                <span class="qa-label">Encuadre:</span>
+                                <span class="qa-status">-</span>
+                            </div>
+                        </div>
+                        <div class="qa-feedback" id="qa-feedback">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Final Report & Database Ingestion -->
+            <section class="panel-card audit-panel">
+                <div class="panel-header">
+                    <h2>🛡️ Auditoría e Ingesta</h2>
+                </div>
+                <div class="panel-body scrollable">
+                    <div class="audit-status-container">
+                        <div class="overall-verdict-badge status-pending" id="overall-verdict">
+                            PENDIENTE
+                        </div>
+                        <p class="verdict-desc" id="verdict-desc">Complete todos los pasos de la orden de trabajo para ejecutar la validación cloud.</p>
+                    </div>
+
+                    <!-- OCR & Data Confirmations -->
+                    <div class="ocr-verification-box hidden" id="ocr-verification-box">
+                        <h3>Validación de MAC / Serial</h3>
+                        <div class="form-group">
+                            <label for="mac-input">Dirección MAC Extraída:</label>
+                            <input type="text" id="mac-input" class="form-control font-mono" placeholder="XX:XX:XX:XX:XX:XX">
+                            <span class="help-text" id="mac-prefix-warning"></span>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="btn-confirm-ocr">Confirmar Datos</button>
+                    </div>
+
+                    <!-- Database Persistence State -->
+                    <div class="persistence-card">
+                        <h3>Estado de Persistencia</h3>
+                        <div class="sync-row">
+                            <span class="sync-label">Almacenamiento Local (IndexedDB):</span>
+                            <span class="sync-val" id="db-local-state">Listo</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Imágenes (Cloud Storage):</span>
+                            <span class="sync-val status-grey" id="db-gcs-state">No Sincronizado</span>
+                        </div>
+                        <div class="sync-row">
+                            <span class="sync-label">Registro Histórico (BigQuery):</span>
+                            <span class="sync-val status-grey" id="db-bq-state">No Guardado</span>
+                        </div>
+                    </div>
+
+                    <!-- Raw JSON Result View -->
+                    <div class="json-report-container">
+                        <h3>Reporte Final (JSON)</h3>
+                        <pre id="json-report" class="json-report">{}</pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Panel: Voice & Agentic Interaction -->
+        <footer class="voice-panel">
+            <div class="voice-controls">
+                <button class="btn-voice inactive" id="btn-voice-agent">
+                    <span class="voice-icon">🎤</span>
+                </button>
+                <div class="voice-status">
+                    <div class="mode-selector">
+                        <button class="btn btn-secondary btn-sm active" id="btn-mode-offline">Offline Conductor</button>
+                        <button class="btn btn-secondary btn-sm" id="btn-mode-online">Agente Live (Nube)</button>
+                    </div>
+                    <span id="voice-agent-prompt" class="voice-prompt">Mantenga presionado el micrófono para hablar...</span>
+                </div>
+            </div>
+            
+            <div class="voice-waves" id="voice-waves">
+                <span class="stroke"></span>
+                <span class="stroke"></span>
+                <span class="stroke"></span>
+                <span class="stroke"></span>
+                <span class="stroke"></span>
+            </div>
+
+            <!-- Dialogue transcript columns -->
+            <div class="dialogue-container" id="dialogue-container">
+                <div class="transcript-bubble agent">
+                    <p>¡Hola! Soy tu asistente de instalación FieldOps. Selecciona una orden de trabajo para iniciar la inspección del ONT.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/storage.js"></script>
+    <script src="/js/camera.js"></script>
+    <script src="/js/edge-ai.js"></script>
+    <script src="/js/voice-conductor.js"></script>
+    <script src="/js/audio-player.js"></script>
+    <script src="/js/audio-recorder.js"></script>
+    <script src="/js/pcm-processor.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,18 +1,18 @@
 # T003 — PWA Shell & Offline Storage
 
 ## Status
-- [ ] Pending  /  [ ] In Progress  /  [ ] ✅ Completed
+- [ ] Pending  /  [ ] In Progress  /  [x] ✅ Completed
 
 ## Description
 Design the frontend Progressive Web App shell. Implement Service Worker caching for offline availability and the IndexedDB persistence layer to handle offline workflows and capture queues.
 
 ## Acceptance Criteria (DoD)
-- [ ] Create HTML shell with CSS styling reflecting rich, premium design (modern styling, clear layout tiles, responsive views).
-- [ ] Implement `service-worker.js` caching resources under a Cache-First scheme. App is installable and fully loads offline.
-- [ ] Build client-side storage engine using IndexedDB storing local capture records (work orders, steps progress, image blobs, voice parameters).
-- [ ] Implement multi-step inspection UI workflow allowing navigation through steps (`site-overview`, `ont-before`, `ont-after-frontal`, `ont-after-closeup`, `power-meter`, `panoramic`).
-- [ ] Steps display current status (completed/pending), guide text, and required evidence validation triggers.
-- [ ] Implement mock Background Sync triggering queue synchronization when online connection is simulated.
+- [x] Create HTML shell with CSS styling reflecting rich, premium design (modern styling, clear layout tiles, responsive views).
+- [x] Implement `service-worker.js` caching resources under a Cache-First scheme. App is installable and fully loads offline.
+- [x] Build client-side storage engine using IndexedDB storing local capture records (work orders, steps progress, image blobs, voice parameters).
+- [x] Implement multi-step inspection UI workflow allowing navigation through steps (`site-overview`, `ont-before`, `ont-after-frontal`, `ont-after-closeup`, `power-meter`, `panoramic`).
+- [x] Steps display current status (completed/pending), guide text, and required evidence validation triggers.
+- [x] Implement mock Background Sync triggering queue synchronization when online connection is simulated.
 
 ## Dependencies
 - `T002 — Mock Data Source & REST APIs`
@@ -35,5 +35,15 @@ Design the frontend Progressive Web App shell. Implement Service Worker caching 
 
 ## Implementation Notes
 - Files created:
+  - `src/static/index.html`
+  - `src/static/css/styles.css`
+  - `src/static/js/app.js`
+  - `src/static/js/storage.js`
+  - `src/static/service-worker.js`
+  - Placeholders in `src/static/js/` to satisfy SW compilation (`camera.js`, `edge-ai.js`, `voice-conductor.js`, etc.)
 - Tests added:
+  - `tests/test_pwa.py` (3 test cases checking serving root HTML, static storage JS, and styles CSS)
 - Notes:
+  - Frontend utilizes a sleek glassmorphic layout tile column system.
+  - Buttons (large actions and voice toggles) are scaled to meet the minimum touch target constraints.
+  - Storage maps separate databases for cached metadata and offline sync cues.
