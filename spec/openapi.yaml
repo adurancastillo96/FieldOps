@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: "[Project Name] API"
+  title: "FieldOps API"
   description: |
-    Machine-readable API specification for the project.
+    Machine-readable API specification for the FieldOps project.
     This file is the canonical source for API contracts.
     See also: spec/API_SPEC.md for human-readable documentation.
   version: 0.1.0
@@ -10,12 +10,12 @@ info:
     name: MIT
     identifier: MIT
   contact:
-    name: "[Team Name]"
+    name: "FieldOps Dev Team"
 
 servers:
   - url: /api/v1
     description: API v1 (default)
-  - url: http://localhost:3000/api/v1
+  - url: http://localhost:8080/api/v1
     description: Local development
 
 security:
@@ -24,7 +24,10 @@ security:
 tags:
   - name: Health
     description: Health check endpoints
-  # Add more tags as resources are defined
+  - name: WorkOrders
+    description: Work order management endpoints
+  - name: Synchronization
+    description: Offline payload synchronization endpoints
 
 paths:
   /health:
@@ -52,26 +55,103 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  # --- Add more paths as they are specified ---
-  # Example resource endpoint (uncomment and customize):
-  #
-  # /resources:
-  #   get:
-  #     operationId: listResources
-  #     summary: List resources
-  #     tags: [Resources]
-  #     parameters:
-  #       - $ref: "#/components/parameters/PageParam"
-  #       - $ref: "#/components/parameters/LimitParam"
-  #     responses:
-  #       "200":
-  #         description: Paginated list of resources
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: "#/components/schemas/PaginatedResponse"
-  #       "401":
-  #         $ref: "#/components/responses/Unauthorized"
+  /work-orders:
+    get:
+      operationId: listWorkOrders
+      summary: List assigned work orders
+      description: Returns a list of work orders assigned to the authenticated technician.
+      tags: [WorkOrders]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, in_progress, completed]
+          description: Filter work orders by status
+      responses:
+        "200":
+          description: List of work orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WorkOrder"
+                required: [data]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /work-orders/{id}:
+    get:
+      operationId: getWorkOrder
+      summary: Get work order by ID
+      description: Returns detailed metadata for a single work order.
+      tags: [WorkOrders]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique work order identifier
+      responses:
+        "200":
+          description: Work order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /sync:
+    post:
+      operationId: syncInspection
+      summary: Synchronize offline inspection payload
+      description: Uploads offline collected inspection steps, metadata, and files.
+      tags: [Synchronization]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                payload:
+                  type: string
+                  description: Stringified JSON containing the inspection steps and metadata.
+                  example: '{"id":"ea32e8fc-f8a4-44cf-a3bc-a4f7e256a001","work_order_id":"7a3b3780-e83c-41c3-8f0a-115f5d888201","technician_id":"tech-01","gps_lat":40.416775,"gps_lon":-3.70379,"steps":[{"step_id":"site-overview","evidence_type":"photo","ocr_value":null,"optical_power_dbm":null,"quality_blur":"pass","quality_exposure":"pass","quality_framing":"pass"}]}'
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Array of evidence files corresponding to steps.
+              required: [payload]
+      responses:
+        "200":
+          description: Inspection successfully synchronized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
 components:
   securitySchemes:
@@ -126,28 +206,51 @@ components:
           required: [code, message]
       required: [error]
 
-    PaginatedResponse:
+    WorkOrder:
       type: object
-      description: Standard paginated response envelope
       properties:
-        data:
-          type: array
-          items: {}
-          description: Array of result items
-        pagination:
-          type: object
-          properties:
-            page:
-              type: integer
-              example: 1
-            limit:
-              type: integer
-              example: 20
-            total:
-              type: integer
-              example: 0
-          required: [page, limit, total]
-      required: [data, pagination]
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        address:
+          type: string
+          example: "Calle Principal 123, Madrid"
+        ont_model:
+          type: string
+          example: "HG8145V5"
+        expected_mac_prefix:
+          type: string
+          example: "48:8F:4C"
+        assigned_technician_id:
+          type: string
+          example: "tech-01"
+        status:
+          type: string
+          enum: [pending, in_progress, completed]
+      required: [id, created_at, updated_at, address, ont_model, expected_mac_prefix, assigned_technician_id, status]
+
+    SyncResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "synced"
+        inspection_id:
+          type: string
+          format: uuid
+        verdict:
+          type: string
+          enum: [approved, rejected, review_required]
+        details:
+          type: string
+          example: "All quality and compliance gates passed successfully."
+      required: [status, inspection_id, verdict, details]
 
   responses:
     BadRequest:
