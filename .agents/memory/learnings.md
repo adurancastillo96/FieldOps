@@ -4,7 +4,8 @@ What worked, what didn't, and what we learned along the way.
 
 | Date | Category | Context | Learning | Action Taken |
 |------|----------|---------|----------|--------------|
-| <!-- YYYY-MM-DD --> | <!-- Worked / Didn't Work / Pattern / Anti-Pattern --> | <!-- Task/Context --> | <!-- What we learned --> | <!-- What changed --> |
+| 2026-07-06 | Didn't Work | Agent Definition (`src/agents/orchestrator.py`) | ADK `LlmAgent` names must be valid Python identifiers; using hyphens raises Pydantic `ValidationError`. | Changed agent name to use underscores (`fieldops_orchestrator`). |
+| 2026-07-06 | Worked | GCP Persistence Integration (`src/services/`) | Providing mock filesystem drop-in saves allowed 100% of unit tests to execute cleanly without active GCP ADC credentials. | Saved files locally under `uploads/` directory on service client creation errors. |
 
 ## Categories
 - **Worked**: Approaches or patterns that proved effective

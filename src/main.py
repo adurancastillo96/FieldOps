@@ -67,9 +67,12 @@ async def validation_exception_handler(request, exc: RequestValidationError):
 
 from fastapi.staticfiles import StaticFiles
 
+from src.routes.analytics import router as analytics_router
+
 # Register routers
 app.include_router(work_orders_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(websocket_router)
 
 

@@ -25,6 +25,9 @@
                 <button class="btn btn-secondary btn-sm" id="btn-sync-queue">
                     🔄 Sincronizar Cola <span class="badge" id="sync-queue-count">0</span>
                 </button>
+                <button class="btn btn-secondary btn-sm" id="btn-toggle-supervisor">
+                    📊 Panel Supervisor
+                </button>
             </div>
         </header>
 
@@ -121,7 +124,7 @@
             </section>
 
             <!-- Right Panel: Final Report & Database Ingestion -->
-            <section class="panel-card audit-panel">
+            <section class="panel-card audit-panel" id="auditor-panel">
                 <div class="panel-header">
                     <h2>🛡️ Auditoría e Ingesta</h2>
                 </div>
@@ -165,6 +168,48 @@
                     <div class="json-report-container">
                         <h3>Reporte Final (JSON)</h3>
                         <pre id="json-report" class="json-report">{}</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel 2: Supervisor & Analytics Panel -->
+            <section class="panel-card audit-panel hidden" id="supervisor-panel">
+                <div class="panel-header">
+                    <h2>📊 Panel Supervisor</h2>
+                </div>
+                <div class="panel-body scrollable">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <span class="metric-val" id="metric-total">0</span>
+                            <span class="metric-label">Instalaciones</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-val" id="metric-rate">0%</span>
+                            <span class="metric-label">Aprobación</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-val" id="metric-mismatches">0</span>
+                            <span class="metric-label">Mismatches MAC</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-val" id="metric-power">0 dBm</span>
+                            <span class="metric-label">Media Potencia</span>
+                        </div>
+                    </div>
+                    
+                    <div class="analytics-input-container">
+                        <h3>💬 Asistente Analítico</h3>
+                        <div class="form-group">
+                            <input type="text" id="analytics-input" class="form-control" placeholder="Pregunte ej: ¿Cuántas fallaron hoy?">
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btn-ask-analytics">Preguntar</button>
+                    </div>
+
+                    <div class="sql-result-container hidden" id="sql-result-container">
+                        <h3>Query SQL Generado</h3>
+                        <pre id="sql-query-display" class="sql-query-display"></pre>
+                        <h3>Resultado</h3>
+                        <pre id="sql-data-display" class="sql-data-display"></pre>
                     </div>
                 </div>
             </section>

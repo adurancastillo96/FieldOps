@@ -245,10 +245,73 @@ const FieldOpsApp = (function() {
         
         btnConfirmOcr.addEventListener('click', handleConfirmOcr);
         
+        // Supervisor & Analytics panel toggling
+        const btnToggleSupervisor = document.getElementById('btn-toggle-supervisor');
+        const auditorPanel = document.getElementById('auditor-panel');
+        const supervisorPanel = document.getElementById('supervisor-panel');
+        
+        btnToggleSupervisor.addEventListener('click', () => {
+            auditorPanel.classList.toggle('hidden');
+            supervisorPanel.classList.toggle('hidden');
+            if (!supervisorPanel.classList.contains('hidden')) {
+                refreshSupervisorMetrics();
+            }
+        });
+
+        // Analytics query submission
+        const btnAskAnalytics = document.getElementById('btn-ask-analytics');
+        const analyticsInput = document.getElementById('analytics-input');
+        const sqlResultContainer = document.getElementById('sql-result-container');
+        const sqlQueryDisplay = document.getElementById('sql-query-display');
+        const sqlDataDisplay = document.getElementById('sql-data-display');
+        
+        btnAskAnalytics.addEventListener('click', async () => {
+            const val = analyticsInput.value.trim();
+            if (!val) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/analytics/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': AUTH_HEADER
+                    },
+                    body: JSON.stringify({ question: val })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    sqlQueryDisplay.textContent = data.sql;
+                    sqlDataDisplay.textContent = JSON.stringify(data.result, null, 2);
+                    sqlResultContainer.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Failed to query conversational analytics:", err);
+            }
+        });
+
         // Global exposure for ORION relayout mock
         window.ORION_relayoutModals = function() {
             console.log("Relayouting panels...");
         };
+    }
+
+    // Refresh aggregated metrics cards on supervisor panel load
+    async function refreshSupervisorMetrics() {
+        try {
+            const response = await fetch(`${API_BASE}/analytics/dashboard`, {
+                headers: { 'Authorization': AUTH_HEADER }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('metric-total').textContent = data.total_installations;
+                document.getElementById('metric-rate').textContent = `${data.approval_rate}%`;
+                document.getElementById('metric-mismatches').textContent = data.ocr_mismatches;
+                document.getElementById('metric-power').textContent = `${data.average_optical_power} dBm`;
+            }
+        } catch (err) {
+            console.error("Failed to load dashboard metrics:", err);
+        }
     }
 
     // Modify connection modes
