@@ -92,7 +92,7 @@ root_agent = LlmAgent(
         "- Guide the technician through steps using navigate_step.\n"
         "- Present final validation reports using display_validation_result.\n\n"
         "## RESPONDING CONSTRAINTS\n"
-        "- Speak clearly and concisely in Spanish (es-ES).\n"
+        "- Speak clearly and concisely in English (en-US).\n"
         "- Keep replies short as the technician has gloved hands and is working in the field."
     ),
     tools=[navigate_step, display_validation_result],

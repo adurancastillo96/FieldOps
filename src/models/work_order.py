@@ -11,6 +11,8 @@ class WorkOrder(BaseModel):
     expected_mac_prefix: str = Field(..., description="Expected MAC vendor prefix")
     assigned_technician_id: str = Field(..., description="Assigned technician username")
     status: str = Field(..., description="Status: pending, in_progress, completed")
+    gps_lat: Optional[float] = Field(None, description="GPS latitude")
+    gps_lon: Optional[float] = Field(None, description="GPS longitude")
 
 # Seed mock database list
 MOCK_WORK_ORDERS = [
@@ -22,7 +24,9 @@ MOCK_WORK_ORDERS = [
         ont_model="HG8145V5",
         expected_mac_prefix="48:8F:4C",
         assigned_technician_id="tech-01",
-        status="pending"
+        status="pending",
+        gps_lat=40.416775,
+        gps_lon=-3.703790
     ),
     WorkOrder(
         id="d74fb899-73e4-4a2e-8392-4fdfb32bb902",
@@ -32,7 +36,9 @@ MOCK_WORK_ORDERS = [
         ont_model="EG8145V5",
         expected_mac_prefix="00:25:9E",
         assigned_technician_id="tech-01",
-        status="in_progress"
+        status="in_progress",
+        gps_lat=41.385063,
+        gps_lon=2.173404
     ),
     WorkOrder(
         id="a184e1b8-6fb2-4752-9b2f-3729e2468303",
@@ -42,6 +48,8 @@ MOCK_WORK_ORDERS = [
         ont_model="HG8245H",
         expected_mac_prefix="E0:24:7F",
         assigned_technician_id="tech-02",
-        status="completed"
+        status="completed",
+        gps_lat=37.389092,
+        gps_lon=-5.984459
     )
 ]

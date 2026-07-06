@@ -27,7 +27,7 @@ const FieldOpsCamera = (function() {
         } catch (error) {
             console.error("Error accessing camera: ", error);
             // Display alert or mock stream for desktop browser tests
-            alert("No se pudo acceder a la cámara. Usando cámara simulada para demostración.");
+            alert("Could not access camera. Using simulated camera for demonstration.");
             setupMockViewfinder();
             return false;
         }
@@ -53,7 +53,7 @@ const FieldOpsCamera = (function() {
         ctx.fillRect(0, 0, 640, 480);
         ctx.fillStyle = '#06b6d4';
         ctx.font = '20px Outfit';
-        ctx.fillText('Cámara de Campo Simulada (FieldOps)', 50, 240);
+        ctx.fillText('Simulated Field Camera (FieldOps)', 50, 240);
         
         captureOverlay.classList.remove('hidden');
     }
@@ -72,7 +72,7 @@ const FieldOpsCamera = (function() {
             ctx.fillRect(0, 0, 640, 480);
             ctx.fillStyle = '#10b981';
             ctx.font = '24px JetBrains Mono';
-            ctx.fillText('DISPOSITIVO ONT MOCK', 180, 200);
+            ctx.fillText('MOCK ONT DEVICE', 180, 200);
             ctx.fillStyle = '#ffffff';
             ctx.font = '16px JetBrains Mono';
             ctx.fillText('MAC: 48:8F:4C:AA:BB:CC', 180, 250);

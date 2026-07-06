@@ -40,11 +40,11 @@ def generate_analytics_sql(question: str) -> str:
         # Static offline heuristic translator if API Key is not set
         logger.warning("GEMINI_API_KEY not found. Using local heuristic translator.")
         q = question.lower()
-        if "fall" in q or "rechaz" in q:
+        if any(w in q for w in ["fall", "rechaz", "fail", "reject"]):
             return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger` WHERE overall_verdict = 'rejected'"
-        elif "aprob" in q:
+        elif any(w in q for w in ["aprob", "approv", "pass"]):
             return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger` WHERE overall_verdict = 'approved'"
-        elif "potencia" in q or "dbm" in q:
+        elif any(w in q for w in ["potencia", "power", "dbm"]):
             return "SELECT AVG(step.optical_power_dbm) FROM `fieldops_dataset.inspection_ledger`, UNNEST(steps) as step WHERE step.step_id = 'power-meter'"
         else:
             return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger`"

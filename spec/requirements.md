@@ -143,7 +143,7 @@ Requirements written in Easy Approach to Requirements Syntax (EARS).
 | ID | Requirement | Priority | Status |
 |----|-------------|----------|--------|
 | NFR-011 | The system shall render all UI elements with touch targets of at least 48×48dp, suitable for gloved-hand operation. | Must | Draft |
-| NFR-012 | The system shall support Spanish as the primary UI and voice language, with English as a secondary option. | Must | Draft |
+| NFR-012 | The system shall support English as the primary UI and voice language. | Must | Draft |
 | NFR-013 | The system shall provide visual and haptic feedback on every user action (photo capture, step completion, voice command recognized). | Should | Draft |
 
 ### Scalability & Deployment

@@ -1,5 +1,5 @@
 ---
-description: Workflow: End-to-end workflow for implementing a new feature.
+description: End-to-end workflow for implementing a new feature.
 ---
 
 # Workflow: Feature Branch

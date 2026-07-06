@@ -21,7 +21,7 @@ const FieldOpsEdgeAI = (function() {
             blur: isBlurry ? 'fail' : 'pass',
             exposure: isUnderexposed ? 'fail' : 'pass',
             framing: 'pass',
-            feedback: 'La imagen cumple con los criterios de nitidez, iluminación y encuadre.'
+            feedback: 'The image meets the criteria for sharpness, lighting, and framing.'
         };
     }
 

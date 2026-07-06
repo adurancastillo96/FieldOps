@@ -15,27 +15,27 @@ const FieldOpsVoiceConductor = (function() {
         
         if (!SpeechRecognition) {
             console.warn("Speech Recognition not supported in this browser");
-            voicePrompt.textContent = "Reconocimiento de voz no soportado (Simulación activa)";
+            voicePrompt.textContent = "Speech recognition not supported (Simulation active)";
             return;
         }
 
         recognition = new SpeechRecognition();
         recognition.continuous = false;
-        recognition.lang = 'es-ES'; // Spanish primary
+        recognition.lang = 'en-US'; // English primary
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
         recognition.onstart = () => {
             isListening = true;
             btnVoiceAgent.className = 'btn-voice active';
-            voicePrompt.textContent = "Escuchando comandos offline...";
+            voicePrompt.textContent = "Listening for offline commands...";
             voiceWaves.classList.add('active');
         };
 
         recognition.onend = () => {
             isListening = false;
             btnVoiceAgent.className = 'btn-voice inactive';
-            voicePrompt.textContent = "Mantenga presionado el micrófono para hablar...";
+            voicePrompt.textContent = "Hold mic button to talk...";
             voiceWaves.classList.remove('active');
         };
 
@@ -68,21 +68,21 @@ const FieldOpsVoiceConductor = (function() {
         }
 
         // Simple keyword matcher (Conductor Mode)
-        if (text.includes('foto') || text.includes('capturar') || text.includes('tomar')) {
-            announceTTS("Tomando fotografía");
+        if (text.includes('photo') || text.includes('capture') || text.includes('take')) {
+            announceTTS("Taking photo");
             triggerCapture();
-        } else if (text.includes('siguiente') || text.includes('continuar')) {
-            announceTTS("Siguiente paso");
+        } else if (text.includes('next') || text.includes('continue')) {
+            announceTTS("Next step");
             triggerNextStep();
-        } else if (text.includes('anterior') || text.includes('atrás') || text.includes('regresar')) {
-            announceTTS("Regresando al paso anterior");
+        } else if (text.includes('previous') || text.includes('back') || text.includes('return')) {
+            announceTTS("Returning to previous step");
             triggerPrevStep();
-        } else if (text.includes('repetir') || text.includes('instrucción')) {
+        } else if (text.includes('repeat') || text.includes('instruction')) {
             triggerRepeatInstruction();
-        } else if (text.includes('resumen') || text.includes('estado')) {
+        } else if (text.includes('summary') || text.includes('status')) {
             triggerShowSummary();
         } else {
-            announceTTS("Comando no reconocido. Intente: foto, siguiente, anterior o repetir.");
+            announceTTS("Command not recognized. Try: photo, next, back, or repeat.");
         }
     }
 
@@ -94,7 +94,7 @@ const FieldOpsVoiceConductor = (function() {
             window.speechSynthesis.cancel();
             
             const utterance = new SpeechUtterance(message);
-            utterance.lang = 'es-ES';
+            utterance.lang = 'en-US';
             window.speechSynthesis.speak(utterance);
         }
     }
@@ -122,21 +122,21 @@ const FieldOpsVoiceConductor = (function() {
     // Mock command simulation
     function simulateVoiceCommand() {
         const mockCommands = [
-            "tomar foto",
-            "siguiente paso",
-            "repetir instrucción",
-            "resumen de instalación"
+            "take photo",
+            "next step",
+            "repeat instruction",
+            "installation summary"
         ];
         // Select random command
         const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
-        voicePrompt.textContent = `Escuchando: "${randomCommand}" (Simulado)`;
+        voicePrompt.textContent = `Listening: "${randomCommand}" (Simulated)`;
         btnVoiceAgent.className = 'btn-voice active';
         voiceWaves.classList.add('active');
         
         setTimeout(() => {
             btnVoiceAgent.className = 'btn-voice inactive';
             voiceWaves.classList.remove('active');
-            voicePrompt.textContent = "Mantenga presionado el micrófono para hablar...";
+            voicePrompt.textContent = "Hold mic button to talk...";
             processVoiceCommand(randomCommand);
         }, 1500);
     }
@@ -175,7 +175,7 @@ const FieldOpsVoiceConductor = (function() {
     function triggerShowSummary() {
         const jsonPre = document.getElementById('json-report');
         if (jsonPre) {
-            announceTTS("Mostrando resumen del reporte de auditoría.");
+            announceTTS("Showing audit report summary.");
         }
     }
 

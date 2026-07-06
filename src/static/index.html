@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FieldOps — Inspección de Fibra FTTH</title>
+    <title>FieldOps — FTTH Fiber Inspection Companion</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -20,231 +20,301 @@
             <div class="header-controls">
                 <div class="network-badge online" id="network-status">
                     <span class="status-dot"></span>
-                    <span class="status-text">Conectado (Nube)</span>
+                    <span class="status-text">Connected (Cloud)</span>
                 </div>
                 <button class="btn btn-secondary btn-sm" id="btn-sync-queue">
-                    🔄 Sincronizar Cola <span class="badge" id="sync-queue-count">0</span>
+                    🔄 Sync Queue <span class="badge" id="sync-queue-count">0</span>
                 </button>
-                <button class="btn btn-secondary btn-sm" id="btn-toggle-supervisor">
-                    📊 Panel Supervisor
+                <!-- Retained hidden/dummy element to prevent app.js from throwing error if accessed -->
+                <button class="btn btn-secondary btn-sm hidden" id="btn-toggle-supervisor">
+                    📊 Supervisor Panel
                 </button>
             </div>
         </header>
 
-        <!-- Main Work Area -->
-        <main class="main-layout">
-            <!-- Left Panel: Work Orders & Steps Workflow -->
-            <section class="panel-card workflow-panel">
+        <!-- Main Work Area (Two-column layout) -->
+        <main class="main-layout claude-layout">
+            
+            <!-- LEFT PANEL: Conversation and Chat Feed (Claude-like chat) -->
+            <section class="panel-card chat-panel">
                 <div class="panel-header">
-                    <h2>📋 Orden de Trabajo</h2>
-                </div>
-                <div class="panel-body">
-                    <div class="wo-select-container">
-                        <label for="wo-select">Seleccionar Orden:</label>
-                        <select id="wo-select" class="form-select">
-                            <option value="">-- Cargar orden de trabajo --</option>
-                        </select>
-                    </div>
-
-                    <div id="wo-details-card" class="wo-details-card hidden">
-                        <div class="wo-info-row">
-                            <span class="label">Dirección:</span>
-                            <span class="value" id="wo-address">-</span>
-                        </div>
-                        <div class="wo-info-row">
-                            <span class="label">ONT Modelo:</span>
-                            <span class="value" id="wo-model">-</span>
-                        </div>
-                        <div class="wo-info-row">
-                            <span class="label">Prefijo MAC:</span>
-                            <span class="value" id="wo-mac-prefix">-</span>
-                        </div>
-                    </div>
-
-                    <!-- Steps Timeline -->
-                    <div class="workflow-steps-container">
-                        <h3>Pasos de Inspección</h3>
-                        <div class="steps-timeline" id="steps-timeline">
-                            <div class="step-placeholder">Seleccione una orden de trabajo para ver los pasos de inspección.</div>
-                        </div>
+                    <h2>💬 Live Assistant</h2>
+                    <div class="mode-selector">
+                        <button class="btn btn-secondary btn-xs active" id="btn-mode-offline">Offline Conductor</button>
+                        <button class="btn btn-secondary btn-xs" id="btn-mode-online">Live Agent (Cloud)</button>
                     </div>
                 </div>
-            </section>
-
-            <!-- Center Panel: Live Camera & Edge AI QA -->
-            <section class="panel-card camera-panel">
-                <div class="panel-header">
-                    <h2>📷 Captura de Evidencia</h2>
-                    <span id="active-step-title" class="active-step-title">Sin paso activo</span>
-                </div>
-                <div class="panel-body camera-body">
-                    <div class="viewfinder-container">
-                        <video id="viewfinder" autoplay playsinline muted class="viewfinder"></video>
-                        <canvas id="viewfinder-canvas" class="viewfinder-canvas hidden"></canvas>
-                        
-                        <!-- Semi-transparent overlay guidelines -->
-                        <div class="camera-guideline" id="camera-guideline">
-                            <div class="guideline-box"></div>
-                        </div>
-
-                        <div class="capture-overlay" id="capture-overlay">
-                            <span class="overlay-instruction">Alinee el dispositivo con el cuadro</span>
-                        </div>
-                    </div>
-
-                    <div class="camera-controls">
-                        <button class="btn btn-primary btn-lg btn-round" id="btn-capture" disabled>
-                            📸 Capturar
-                        </button>
-                        <button class="btn btn-secondary btn-lg btn-round hidden" id="btn-retake">
-                            🔄 Repetir
-                        </button>
-                    </div>
-
-                    <!-- Edge QA Scores Grid -->
-                    <div class="qa-results-container hidden" id="qa-results-container">
-                        <h4>Resultados de Calidad (Edge AI)</h4>
-                        <div class="qa-grid">
-                            <div class="qa-item" id="qa-blur">
-                                <span class="qa-label">Nitidez:</span>
-                                <span class="qa-status">-</span>
-                            </div>
-                            <div class="qa-item" id="qa-exposure">
-                                <span class="qa-label">Exposición:</span>
-                                <span class="qa-status">-</span>
-                            </div>
-                            <div class="qa-item" id="qa-framing">
-                                <span class="qa-label">Encuadre:</span>
-                                <span class="qa-status">-</span>
-                            </div>
-                        </div>
-                        <div class="qa-feedback" id="qa-feedback">-</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Right Panel: Final Report & Database Ingestion -->
-            <section class="panel-card audit-panel" id="auditor-panel">
-                <div class="panel-header">
-                    <h2>🛡️ Auditoría e Ingesta</h2>
-                </div>
-                <div class="panel-body scrollable">
-                    <div class="audit-status-container">
-                        <div class="overall-verdict-badge status-pending" id="overall-verdict">
-                            PENDIENTE
-                        </div>
-                        <p class="verdict-desc" id="verdict-desc">Complete todos los pasos de la orden de trabajo para ejecutar la validación cloud.</p>
-                    </div>
-
-                    <!-- OCR & Data Confirmations -->
-                    <div class="ocr-verification-box hidden" id="ocr-verification-box">
-                        <h3>Validación de MAC / Serial</h3>
-                        <div class="form-group">
-                            <label for="mac-input">Dirección MAC Extraída:</label>
-                            <input type="text" id="mac-input" class="form-control font-mono" placeholder="XX:XX:XX:XX:XX:XX">
-                            <span class="help-text" id="mac-prefix-warning"></span>
-                        </div>
-                        <button class="btn btn-secondary btn-sm" id="btn-confirm-ocr">Confirmar Datos</button>
-                    </div>
-
-                    <!-- Database Persistence State -->
-                    <div class="persistence-card">
-                        <h3>Estado de Persistencia</h3>
-                        <div class="sync-row">
-                            <span class="sync-label">Almacenamiento Local (IndexedDB):</span>
-                            <span class="sync-val" id="db-local-state">Listo</span>
-                        </div>
-                        <div class="sync-row">
-                            <span class="sync-label">Imágenes (Cloud Storage):</span>
-                            <span class="sync-val status-grey" id="db-gcs-state">No Sincronizado</span>
-                        </div>
-                        <div class="sync-row">
-                            <span class="sync-label">Registro Histórico (BigQuery):</span>
-                            <span class="sync-val status-grey" id="db-bq-state">No Guardado</span>
-                        </div>
-                    </div>
-
-                    <!-- Raw JSON Result View -->
-                    <div class="json-report-container">
-                        <h3>Reporte Final (JSON)</h3>
-                        <pre id="json-report" class="json-report">{}</pre>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Right Panel 2: Supervisor & Analytics Panel -->
-            <section class="panel-card audit-panel hidden" id="supervisor-panel">
-                <div class="panel-header">
-                    <h2>📊 Panel Supervisor</h2>
-                </div>
-                <div class="panel-body scrollable">
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <span class="metric-val" id="metric-total">0</span>
-                            <span class="metric-label">Instalaciones</span>
-                        </div>
-                        <div class="metric-card">
-                            <span class="metric-val" id="metric-rate">0%</span>
-                            <span class="metric-label">Aprobación</span>
-                        </div>
-                        <div class="metric-card">
-                            <span class="metric-val" id="metric-mismatches">0</span>
-                            <span class="metric-label">Mismatches MAC</span>
-                        </div>
-                        <div class="metric-card">
-                            <span class="metric-val" id="metric-power">0 dBm</span>
-                            <span class="metric-label">Media Potencia</span>
+                
+                <div class="panel-body chat-body">
+                    <!-- Dialogue Feed -->
+                    <div class="dialogue-container" id="dialogue-container">
+                        <div class="transcript-bubble agent">
+                            <p>Hello! I am your FieldOps installation assistant. Please load a work order from the Work Orders tab to start your ONT inspection.</p>
                         </div>
                     </div>
                     
-                    <div class="analytics-input-container">
-                        <h3>💬 Asistente Analítico</h3>
-                        <div class="form-group">
-                            <input type="text" id="analytics-input" class="form-control" placeholder="Pregunte ej: ¿Cuántas fallaron hoy?">
-                        </div>
-                        <button class="btn btn-primary btn-sm" id="btn-ask-analytics">Preguntar</button>
+                    <!-- Voice waves visualization -->
+                    <div class="voice-waves" id="voice-waves">
+                        <span class="stroke"></span>
+                        <span class="stroke"></span>
+                        <span class="stroke"></span>
+                        <span class="stroke"></span>
+                        <span class="stroke"></span>
                     </div>
-
-                    <div class="sql-result-container hidden" id="sql-result-container">
-                        <h3>Query SQL Generado</h3>
-                        <pre id="sql-query-display" class="sql-query-display"></pre>
-                        <h3>Resultado</h3>
-                        <pre id="sql-data-display" class="sql-data-display"></pre>
+                    
+                    <!-- Claude-style Chat Box input -->
+                    <div class="chat-input-area">
+                        <!-- Microphone press-to-talk button -->
+                        <button class="btn-voice inactive" id="btn-voice-agent" title="Hold to speak">
+                            <span class="voice-icon">🎤</span>
+                        </button>
+                        
+                        <div class="text-input-row">
+                            <input type="text" id="chat-text-input" class="form-control chat-text-input" placeholder="Type a message to the agent...">
+                            <button class="btn btn-primary" id="btn-send-chat">Send</button>
+                        </div>
+                    </div>
+                    <div class="voice-prompt-container">
+                        <span id="voice-agent-prompt" class="voice-prompt">Hold the microphone button or type a message to converse...</span>
                     </div>
                 </div>
             </section>
-        </main>
 
-        <!-- Bottom Panel: Voice & Agentic Interaction -->
-        <footer class="voice-panel">
-            <div class="voice-controls">
-                <button class="btn-voice inactive" id="btn-voice-agent">
-                    <span class="voice-icon">🎤</span>
-                </button>
-                <div class="voice-status">
-                    <div class="mode-selector">
-                        <button class="btn btn-secondary btn-sm active" id="btn-mode-offline">Offline Conductor</button>
-                        <button class="btn btn-secondary btn-sm" id="btn-mode-online">Agente Live (Nube)</button>
+            <!-- RIGHT PANEL: Multipurpose Visualization Panel -->
+            <section class="panel-card multipurpose-panel">
+                <!-- Tab headers -->
+                <div class="tab-bar">
+                    <button class="tab-btn active" data-tab="camera-tab">📷 Camera</button>
+                    <button class="tab-btn" data-tab="photo-tab">🖼️ Captured Photo</button>
+                    <button class="tab-btn" data-tab="map-tab">🗺️ Deployment Map</button>
+                    <button class="tab-btn" data-tab="wo-tab">📋 Work Orders</button>
+                    <button class="tab-btn" data-tab="supervisor-tab">📊 Supervisor</button>
+                </div>
+                
+                <div class="tab-contents-container">
+                    
+                    <!-- Tab 1: Live Camera viewfinder & edge QA -->
+                    <div class="tab-content active" id="camera-tab">
+                        <div class="panel-header-sub">
+                            <h3>Camera view</h3>
+                            <span id="active-step-title" class="active-step-title">No active step</span>
+                        </div>
+                        <div class="tab-body camera-tab-body">
+                            <div class="viewfinder-container">
+                                <video id="viewfinder" autoplay playsinline muted class="viewfinder"></video>
+                                <canvas id="viewfinder-canvas" class="viewfinder-canvas hidden"></canvas>
+                                
+                                <!-- Guide box overlays -->
+                                <div class="camera-guideline" id="camera-guideline">
+                                    <div class="guideline-box"></div>
+                                </div>
+
+                                <div class="capture-overlay" id="capture-overlay">
+                                    <span class="overlay-instruction">Align device inside guidelines box</span>
+                                </div>
+                            </div>
+
+                            <div class="camera-controls">
+                                <button class="btn btn-primary btn-lg btn-round" id="btn-capture" disabled>
+                                    📸 Capture Photo
+                                </button>
+                                <button class="btn btn-secondary btn-lg btn-round hidden" id="btn-retake">
+                                    🔄 Retake
+                                </button>
+                            </div>
+
+                            <!-- Edge QA Results -->
+                            <div class="qa-results-container hidden" id="qa-results-container">
+                                <h4>Quality Results (Edge AI)</h4>
+                                <div class="qa-grid">
+                                    <div class="qa-item" id="qa-blur">
+                                        <span class="qa-label">Sharpness:</span>
+                                        <span class="qa-status">-</span>
+                                    </div>
+                                    <div class="qa-item" id="qa-exposure">
+                                        <span class="qa-label">Exposure:</span>
+                                        <span class="qa-status">-</span>
+                                    </div>
+                                    <div class="qa-item" id="qa-framing">
+                                        <span class="qa-label">Framing:</span>
+                                        <span class="qa-status">-</span>
+                                    </div>
+                                </div>
+                                <div class="qa-feedback" id="qa-feedback">-</div>
+                            </div>
+                            
+                            <!-- OCR extraction verification block -->
+                            <div class="ocr-verification-box hidden" id="ocr-verification-box">
+                                <h3>MAC & Serial Scan Verification</h3>
+                                <div class="form-group">
+                                    <label for="mac-input">Extracted MAC Address:</label>
+                                    <input type="text" id="mac-input" class="form-control font-mono" placeholder="XX:XX:XX:XX:XX:XX">
+                                    <span class="help-text" id="mac-prefix-warning"></span>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="btn-confirm-ocr">Confirm Data</button>
+                            </div>
+                        </div>
                     </div>
-                    <span id="voice-agent-prompt" class="voice-prompt">Mantenga presionado el micrófono para hablar...</span>
-                </div>
-            </div>
-            
-            <div class="voice-waves" id="voice-waves">
-                <span class="stroke"></span>
-                <span class="stroke"></span>
-                <span class="stroke"></span>
-                <span class="stroke"></span>
-                <span class="stroke"></span>
-            </div>
 
-            <!-- Dialogue transcript columns -->
-            <div class="dialogue-container" id="dialogue-container">
-                <div class="transcript-bubble agent">
-                    <p>¡Hola! Soy tu asistente de instalación FieldOps. Selecciona una orden de trabajo para iniciar la inspección del ONT.</p>
+                    <!-- Tab 2: Captured step photo viewer -->
+                    <div class="tab-content" id="photo-tab">
+                        <div class="panel-header-sub">
+                            <h3>Captured step evidence</h3>
+                        </div>
+                        <div class="tab-body photo-tab-body">
+                            <div class="photo-viewer-container" id="photo-viewer-container">
+                                <div class="photo-placeholder" id="photo-viewer-placeholder">
+                                    <span>No evidence captured for the current step yet. Complete camera capture to view.</span>
+                                </div>
+                                <img id="photo-viewer-img" class="photo-viewer-img hidden" src="" alt="Captured step evidence">
+                            </div>
+                            <div class="photo-viewer-details" id="photo-viewer-details">
+                                <!-- Details populate dynamically when photo is captured -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Google Maps deployment route view -->
+                    <div class="tab-content" id="map-tab">
+                        <div class="panel-header-sub">
+                            <h3>Deployment Route Map</h3>
+                            <span class="map-label">Google Maps Simulated API</span>
+                        </div>
+                        <div class="tab-body map-tab-body">
+                            <div class="map-container-wrapper">
+                                <canvas id="deployment-map-canvas" class="deployment-map-canvas"></canvas>
+                                <div class="map-legend">
+                                    <div class="legend-item"><span class="legend-dot tech"></span>Technician</div>
+                                    <div class="legend-item"><span class="legend-dot hub"></span>Splitter Hub</div>
+                                    <div class="legend-item"><span class="legend-dot customer"></span>Customer Premises</div>
+                                </div>
+                            </div>
+                            <div class="map-details-card" id="map-details-card">
+                                <div class="map-row">
+                                    <span class="label">Route Distance:</span>
+                                    <span class="value" id="map-route-dist">N/A</span>
+                                </div>
+                                <div class="map-row">
+                                    <span class="label">Estimated Travel Time:</span>
+                                    <span class="value" id="map-route-time">N/A</span>
+                                </div>
+                                <div class="map-row">
+                                    <span class="label">Olt GPON Port ID:</span>
+                                    <span class="value" id="map-gpon-port">N/A</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 4: Work order management, steps, sync status -->
+                    <div class="tab-content" id="wo-tab">
+                        <!-- Retained IDs for compatibility with app.js selectors -->
+                        <div class="tab-body wo-tab-body scrollable" id="auditor-panel">
+                            <div class="wo-select-container">
+                                <label for="wo-select">Select Work Order:</label>
+                                <select id="wo-select" class="form-select">
+                                    <option value="">-- Load work order --</option>
+                                </select>
+                            </div>
+
+                            <div id="wo-details-card" class="wo-details-card hidden">
+                                <div class="wo-info-row">
+                                    <span class="label">Address:</span>
+                                    <span class="value" id="wo-address">-</span>
+                                </div>
+                                <div class="wo-info-row">
+                                    <span class="label">ONT Model:</span>
+                                    <span class="value" id="wo-model">-</span>
+                                </div>
+                                <div class="wo-info-row">
+                                    <span class="label">Expected MAC Prefix:</span>
+                                    <span class="value" id="wo-mac-prefix">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Steps Timeline -->
+                            <div class="workflow-steps-container">
+                                <h3>Inspection steps timeline</h3>
+                                <div class="steps-timeline" id="steps-timeline">
+                                    <div class="step-placeholder">Select a work order to see the inspection steps timeline.</div>
+                                </div>
+                            </div>
+
+                            <div class="audit-status-container">
+                                <div class="overall-verdict-badge status-pending" id="overall-verdict">
+                                    PENDING
+                                </div>
+                                <p class="verdict-desc" id="verdict-desc">Complete all work order steps to trigger cloud audit verification.</p>
+                            </div>
+
+                            <!-- Database Persistence State -->
+                            <div class="persistence-card">
+                                <h3>Persistence Status</h3>
+                                <div class="sync-row">
+                                    <span class="sync-label">Local Storage (IndexedDB):</span>
+                                    <span class="sync-val" id="db-local-state">Ready</span>
+                                </div>
+                                <div class="sync-row">
+                                    <span class="sync-label">Images (Cloud Storage):</span>
+                                    <span class="sync-val status-grey" id="db-gcs-state">Not Synced</span>
+                                </div>
+                                <div class="sync-row">
+                                    <span class="sync-label">Audit Ledger (BigQuery):</span>
+                                    <span class="sync-val status-grey" id="db-bq-state">Not Saved</span>
+                                </div>
+                            </div>
+
+                            <!-- Raw JSON Result View -->
+                            <div class="json-report-container">
+                                <h3>Final Report payload (JSON)</h3>
+                                <pre id="json-report" class="json-report">{}</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 5: Supervisor dashboard -->
+                    <div class="tab-content" id="supervisor-tab">
+                        <!-- Retained IDs for compatibility with app.js selectors -->
+                        <div class="tab-body supervisor-tab-body scrollable" id="supervisor-panel">
+                            <div class="metrics-grid">
+                                <div class="metric-card">
+                                    <span class="metric-val" id="metric-total">0</span>
+                                    <span class="metric-label">Installations</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-val" id="metric-rate">0%</span>
+                                    <span class="metric-label">Approval rate</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-val" id="metric-mismatches">0</span>
+                                    <span class="metric-label">MAC Mismatches</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-val" id="metric-power">0 dBm</span>
+                                    <span class="metric-label">Avg Power Level</span>
+                                </div>
+                            </div>
+                            
+                            <div class="analytics-input-container">
+                                <h3>💬 Conversational Analytics Assistant</h3>
+                                <div class="form-group">
+                                    <input type="text" id="analytics-input" class="form-control" placeholder="Ask: 'How many approved today?' or 'show average power'">
+                                </div>
+                                <button class="btn btn-primary btn-sm" id="btn-ask-analytics">Submit Inquiry</button>
+                            </div>
+
+                            <div class="sql-result-container hidden" id="sql-result-container">
+                                <h3>Generated SQL Query</h3>
+                                <pre id="sql-query-display" class="sql-query-display"></pre>
+                                <h3>Execution Output</h3>
+                                <pre id="sql-data-display" class="sql-data-display"></pre>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
-            </div>
-        </footer>
+            </section>
+        </main>
     </div>
 
     <!-- Scripts -->

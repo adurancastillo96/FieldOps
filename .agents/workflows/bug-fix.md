@@ -1,5 +1,5 @@
 ---
-description: Workflow: Diagnose, fix, and verify a reported bug.
+description: Diagnose, fix, and verify a reported bug.
 ---
 
 # Workflow: Bug Fix

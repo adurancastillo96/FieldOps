@@ -1,5 +1,5 @@
 ---
-description: Workflow: Prepare, verify, and execute a project release.
+description: Prepare, verify, and execute a project release.
 ---
 
 # Workflow: Release

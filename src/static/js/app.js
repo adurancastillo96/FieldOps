@@ -5,14 +5,14 @@ const FieldOpsApp = (function() {
     const API_BASE = '/api/v1';
     const AUTH_HEADER = 'Bearer test-token-123';
     
-    // Workflow steps definition
+    // Workflow steps definition (Translated to English)
     const INSPECTION_STEPS = [
-        { id: 'site-overview', name: 'Entorno de Instalación', desc: 'Capture una foto general del área de trabajo.', type: 'photo', mandatory: true },
-        { id: 'ont-before', name: 'Antes de Instalar', desc: 'Capture una foto de la roseta óptica antes de montar el ONT.', type: 'photo', mandatory: true },
-        { id: 'ont-after-frontal', name: 'ONT Frontal', desc: 'Capture una foto frontal del ONT ya montado y encendido.', type: 'photo', mandatory: true },
-        { id: 'ont-after-closeup', name: 'Etiqueta ONT (Detalle)', desc: 'Capture una foto de cerca de la etiqueta con código de barras y MAC.', type: 'photo', mandatory: true },
-        { id: 'power-meter', name: 'Potencia Óptica', desc: 'Capture una foto de la lectura del Power Meter o introduzca el valor.', type: 'reading', mandatory: true },
-        { id: 'panoramic', name: 'Instalación Completa', desc: 'Capture una foto panorámica de toda la roseta, latiguillo y ONT final.', type: 'photo', mandatory: true }
+        { id: 'site-overview', name: 'Installation Environment', desc: 'Capture a general photo of the workspace area.', type: 'photo', mandatory: true },
+        { id: 'ont-before', name: 'Before Installation', desc: 'Capture a photo of the optical rosette before mounting the ONT.', type: 'photo', mandatory: true },
+        { id: 'ont-after-frontal', name: 'ONT Frontal', desc: 'Capture a frontal photo of the ONT already mounted and turned on.', type: 'photo', mandatory: true },
+        { id: 'ont-after-closeup', name: 'ONT Label (Detail)', desc: 'Capture a close-up photo of the label with the barcode and MAC.', type: 'photo', mandatory: true },
+        { id: 'power-meter', name: 'Optical Power', desc: 'Capture a photo of the Power Meter reading or enter the value.', type: 'reading', mandatory: true },
+        { id: 'panoramic', name: 'Complete Installation', desc: 'Capture a panoramic photo of the rosette, patch cord, and final ONT.', type: 'photo', mandatory: true }
     ];
 
     // App state variables
@@ -49,11 +49,15 @@ const FieldOpsApp = (function() {
     const btnModeOffline = document.getElementById('btn-mode-offline');
     const btnModeOnline = document.getElementById('btn-mode-online');
     const networkStatus = document.getElementById('network-status');
-    const voiceAgentPrompt = document.getElementById('voice-agent-prompt');
+    const voicePrompt = document.getElementById('voice-agent-prompt');
     const voiceWaves = document.getElementById('voice-waves');
     
     const dialogueContainer = document.getElementById('dialogue-container');
     const btnVoiceAgent = document.getElementById('btn-voice-agent');
+
+    // New Claude Chat Inputs
+    const chatTextInput = document.getElementById('chat-text-input');
+    const btnSendChat = document.getElementById('btn-send-chat');
     
     const overallVerdict = document.getElementById('overall-verdict');
     const verdictDesc = document.getElementById('verdict-desc');
@@ -74,13 +78,15 @@ const FieldOpsApp = (function() {
         
         try {
             await FieldOpsStorage.init();
-            dbLocalState.textContent = "Conectado";
+            dbLocalState.textContent = "Connected";
             dbLocalState.className = "sync-val status-green";
             
             await syncWorkOrders();
             await renderWorkOrderDropdown();
             await updateSyncQueueBadge();
             setupEventListeners();
+            setupTabs();
+            drawRouteMap();
         } catch (error) {
             console.error("Initialization failed:", error);
             dbLocalState.textContent = "Error";
@@ -118,11 +124,11 @@ const FieldOpsApp = (function() {
     // Render drop-down options
     async function renderWorkOrderDropdown() {
         const workOrders = await FieldOpsStorage.getWorkOrders();
-        woSelect.innerHTML = '<option value="">-- Cargar orden de trabajo --</option>';
+        woSelect.innerHTML = '<option value="">-- Load work order --</option>';
         workOrders.forEach(wo => {
             const opt = document.createElement('option');
             opt.value = wo.id;
-            opt.textContent = `WO-${wo.id.substring(0,8)} (${wo.status}) - ${wo.address}`;
+            opt.textContent = `WO-${wo.id.substring(0,8)} (${wo.status.toUpperCase()}) - ${wo.address}`;
             woSelect.appendChild(opt);
         });
     }
@@ -132,12 +138,14 @@ const FieldOpsApp = (function() {
         const woId = event.target.value;
         if (!woId) {
             woDetailsCard.classList.add('hidden');
-            stepsTimeline.innerHTML = '<div class="step-placeholder">Seleccione una orden de trabajo para ver los pasos de inspección.</div>';
+            stepsTimeline.innerHTML = '<div class="step-placeholder">Select a work order to see the inspection steps timeline.</div>';
             currentWorkOrder = null;
             currentInspection = null;
             btnCapture.disabled = true;
             FieldOpsCamera.stop();
             disconnectWebSocket();
+            drawRouteMap();
+            resetPhotoViewer();
             return;
         }
 
@@ -156,7 +164,7 @@ const FieldOpsApp = (function() {
                 id: crypto.randomUUID(),
                 work_order_id: woId,
                 technician_id: currentWorkOrder.assigned_technician_id,
-                overall_verdict: 'PENDIENTE',
+                overall_verdict: 'PENDING',
                 status: 'draft',
                 created_at: new Date().toISOString()
             };
@@ -171,7 +179,11 @@ const FieldOpsApp = (function() {
         // Start live camera viewfinder
         await FieldOpsCamera.start();
         
-        const welcomeMsg = `Se ha cargado la orden WO-${woId.substring(0,8)}. Por favor, realice la primera toma: ${INSPECTION_STEPS[0].name}.`;
+        // If map tab active or when work order changes, redraw map
+        drawRouteMap();
+        await updatePhotoViewerForCurrentStep();
+
+        const welcomeMsg = `Work order WO-${woId.substring(0,8)} loaded. Please capture the first image: ${INSPECTION_STEPS[0].name}.`;
         appendDialogue('agent', welcomeMsg);
         FieldOpsVoiceConductor.announce(welcomeMsg);
     }
@@ -225,12 +237,268 @@ const FieldOpsApp = (function() {
     }
 
     // Select step manually
-    function selectStep(idx) {
+    async function selectStep(idx) {
         activeStepIdx = idx;
-        renderSteps();
+        await renderSteps();
+        await updatePhotoViewerForCurrentStep();
         
         const step = INSPECTION_STEPS[activeStepIdx];
-        FieldOpsVoiceConductor.announce(`Cargando paso: ${step.name}. ${step.desc}`);
+        FieldOpsVoiceConductor.announce(`Loading step: ${step.name}. ${step.desc}`);
+    }
+
+    // Tab Navigation setup
+    function setupTabs() {
+        const tabs = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                const targetTab = tab.dataset.tab;
+                document.getElementById(targetTab).classList.add('active');
+                
+                if (targetTab === 'map-tab') {
+                    // Redraw map on canvas
+                    setTimeout(drawRouteMap, 50);
+                }
+            });
+        });
+    }
+
+    // Google Maps Route Simulation
+    function drawRouteMap() {
+        const canvas = document.getElementById('deployment-map-canvas');
+        if (!canvas) return;
+        
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width || 400;
+        canvas.height = rect.height || 300;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Background Grid (Block pattern)
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw grid lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+        ctx.lineWidth = 12;
+        const gridSpacing = 60;
+        for (let x = 0; x < canvas.width; x += gridSpacing) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += gridSpacing) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+        
+        if (!currentWorkOrder) {
+            // Draw default state
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.font = '14px Outfit';
+            ctx.textAlign = 'center';
+            ctx.fillText('Select a work order to view route details.', canvas.width / 2, canvas.height / 2);
+            
+            document.getElementById('map-route-dist').textContent = 'N/A';
+            document.getElementById('map-route-time').textContent = 'N/A';
+            document.getElementById('map-gpon-port').textContent = 'N/A';
+            return;
+        }
+        
+        let points = [];
+        let details = {};
+        
+        // Map points by address
+        if (currentWorkOrder.address.includes('Madrid')) {
+            points = [
+                { x: 50, y: 220, label: 'Technician' },
+                { x: 180, y: 140, label: 'Splitter Hub OLT-MAD-12' },
+                { x: 320, y: 80, label: 'Customer Premises' }
+            ];
+            details = { dist: '2.4 miles', time: '8 mins', gpon: 'GPON_OLT_04/2/1' };
+        } else if (currentWorkOrder.address.includes('Barcelona')) {
+            points = [
+                { x: 80, y: 240, label: 'Technician' },
+                { x: 220, y: 180, label: 'Splitter Hub OLT-BCN-09' },
+                { x: 300, y: 60, label: 'Customer Premises' }
+            ];
+            details = { dist: '3.1 miles', time: '11 mins', gpon: 'GPON_OLT_02/1/7' };
+        } else {
+            points = [
+                { x: 60, y: 200, label: 'Technician' },
+                { x: 150, y: 110, label: 'Splitter Hub OLT-SEV-03' },
+                { x: 340, y: 90, label: 'Customer Premises' }
+            ];
+            details = { dist: '1.8 miles', time: '6 mins', gpon: 'GPON_OLT_07/4/3' };
+        }
+        
+        document.getElementById('map-route-dist').textContent = details.dist;
+        document.getElementById('map-route-time').textContent = details.time;
+        document.getElementById('map-gpon-port').textContent = details.gpon;
+        
+        // Draw route path line
+        ctx.strokeStyle = '#06B6D4';
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.lineTo(points[1].x, points[0].y); 
+        ctx.lineTo(points[1].x, points[1].y);
+        ctx.lineTo(points[2].x, points[1].y); 
+        ctx.lineTo(points[2].x, points[2].y);
+        ctx.stroke();
+        
+        // Draw markers
+        // 1. Technician (Cyan dot)
+        ctx.fillStyle = '#06B6D4';
+        ctx.beginPath();
+        ctx.arc(points[0].x, points[0].y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.3)';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        
+        // 2. Hub (Yellow square)
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillRect(points[1].x - 6, points[1].y - 6, 12, 12);
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(points[1].x - 8, points[1].y - 8, 16, 16);
+        
+        // 3. Customer (Green pin shape)
+        ctx.fillStyle = '#10B981';
+        ctx.beginPath();
+        ctx.arc(points[2].x, points[2].y - 10, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(points[2].x - 8, points[2].y - 10);
+        ctx.lineTo(points[2].x, points[2].y);
+        ctx.lineTo(points[2].x + 8, points[2].y - 10);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(points[2].x, points[2].y - 10, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Text labels
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Outfit';
+        ctx.textAlign = 'center';
+        ctx.fillText('Tech', points[0].x, points[0].y + 22);
+        ctx.fillText('Hub', points[1].x, points[1].y + 22);
+        ctx.fillText('Customer', points[2].x, points[2].y + 12);
+    }
+
+    // Photo viewer visual updates
+    async function updatePhotoViewerForCurrentStep() {
+        if (!currentInspection) {
+            resetPhotoViewer();
+            return;
+        }
+        
+        const activeStep = INSPECTION_STEPS[activeStepIdx];
+        const stepRecord = await FieldOpsStorage.getStep(currentInspection.id, activeStep.id);
+        
+        const imgElement = document.getElementById('photo-viewer-img');
+        const placeholder = document.getElementById('photo-viewer-placeholder');
+        const details = document.getElementById('photo-viewer-details');
+        
+        if (stepRecord && stepRecord.image_url) {
+            // Retrieve image from IndexedDB step record
+            const localImage = stepRecord.image_data;
+            imgElement.src = localImage || '/images/captured-placeholder.jpg';
+            imgElement.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            
+            details.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                    <strong>Step Name:</strong> <span>${activeStep.name}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                    <strong>Evidence Type:</strong> <span style="text-transform:uppercase;">${stepRecord.evidence_type}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                    <strong>Blur Audit:</strong> <span class="qa-status ${stepRecord.quality_blur}">${stepRecord.quality_blur.toUpperCase()}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                    <strong>Exposure Audit:</strong> <span class="qa-status ${stepRecord.quality_exposure}">${stepRecord.quality_exposure.toUpperCase()}</span>
+                </div>
+                ${stepRecord.ocr_value ? `<div style="display:flex; justify-content:space-between;"><strong>Extracted MAC:</strong> <span class="font-mono">${stepRecord.ocr_value}</span></div>` : ''}
+            `;
+        } else {
+            resetPhotoViewer();
+        }
+    }
+
+    function resetPhotoViewer() {
+        const imgElement = document.getElementById('photo-viewer-img');
+        const placeholder = document.getElementById('photo-viewer-placeholder');
+        const details = document.getElementById('photo-viewer-details');
+        
+        if (imgElement) imgElement.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
+        if (details) details.innerHTML = 'No photo evidence captured for this step yet.';
+    }
+
+    // Handle Manual Text message from Claude UI chat panel
+    function handleManualChatSend() {
+        const text = chatTextInput.value.trim();
+        if (!text) return;
+        
+        appendDialogue('user', text);
+        chatTextInput.value = '';
+        
+        if (connectionMode === 'online' && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'text',
+                content: text
+            }));
+        } else {
+            // Local fallback analyzer
+            simulateOfflineTextCommand(text);
+        }
+    }
+
+    // Local heuristic analyzer for offline text message inputs
+    function simulateOfflineTextCommand(text) {
+        const q = text.toLowerCase().trim();
+        if (q.includes('photo') || q.includes('capture') || q.includes('take')) {
+            FieldOpsVoiceConductor.announce("Taking photo");
+            btnCapture.click();
+        } else if (q.includes('next') || q.includes('continue')) {
+            FieldOpsVoiceConductor.announce("Next step");
+            nextStep();
+        } else if (q.includes('previous') || q.includes('back') || q.includes('return')) {
+            FieldOpsVoiceConductor.announce("Returning to previous step");
+            prevStep();
+        } else if (q.includes('repeat') || q.includes('instruction')) {
+            const activeTitle = document.getElementById('active-step-title');
+            if (activeTitle) {
+                FieldOpsVoiceConductor.announce(activeTitle.textContent);
+            }
+        } else if (q.includes('summary') || q.includes('status')) {
+            FieldOpsVoiceConductor.announce("Showing audit report summary.");
+            const jsonPre = document.getElementById('json-report');
+            if (jsonPre) {
+                appendDialogue('agent', `Audit report payload:\n${jsonPre.textContent}`);
+            }
+        } else {
+            setTimeout(() => {
+                appendDialogue('agent', "Command not recognized offline. Try: 'take photo', 'next step', 'back', 'repeat instruction', or switch to Live Agent mode.");
+            }, 800);
+        }
     }
 
     // Setup event handlers
@@ -242,20 +510,12 @@ const FieldOpsApp = (function() {
         
         btnCapture.addEventListener('click', handleCapture);
         btnSyncQueue.addEventListener('click', handleManualSync);
-        
         btnConfirmOcr.addEventListener('click', handleConfirmOcr);
         
-        // Supervisor & Analytics panel toggling
-        const btnToggleSupervisor = document.getElementById('btn-toggle-supervisor');
-        const auditorPanel = document.getElementById('auditor-panel');
-        const supervisorPanel = document.getElementById('supervisor-panel');
-        
-        btnToggleSupervisor.addEventListener('click', () => {
-            auditorPanel.classList.toggle('hidden');
-            supervisorPanel.classList.toggle('hidden');
-            if (!supervisorPanel.classList.contains('hidden')) {
-                refreshSupervisorMetrics();
-            }
+        // Manual Chat Input buttons
+        btnSendChat.addEventListener('click', handleManualChatSend);
+        chatTextInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleManualChatSend();
         });
 
         // Analytics query submission
@@ -318,18 +578,18 @@ const FieldOpsApp = (function() {
     async function setConnectionMode(mode) {
         connectionMode = mode;
         if (mode === 'offline') {
-            btnModeOffline.className = 'btn btn-secondary btn-sm active';
-            btnModeOnline.className = 'btn btn-secondary btn-sm';
+            btnModeOffline.className = 'btn btn-secondary btn-xs active';
+            btnModeOnline.className = 'btn btn-secondary btn-xs';
             networkStatus.className = 'network-badge offline';
-            networkStatus.querySelector('.status-text').textContent = 'Modo Conductor (Offline)';
-            voicePrompt.textContent = 'Offline Conductor listo para comandos de voz...';
+            networkStatus.querySelector('.status-text').textContent = 'Offline Conductor';
+            voicePrompt.textContent = 'Offline Conductor ready for voice commands...';
             disconnectWebSocket();
         } else {
-            btnModeOffline.className = 'btn btn-secondary btn-sm';
-            btnModeOnline.className = 'btn btn-secondary btn-sm active';
+            btnModeOffline.className = 'btn btn-secondary btn-xs';
+            btnModeOnline.className = 'btn btn-secondary btn-xs active';
             networkStatus.className = 'network-badge online';
-            networkStatus.querySelector('.status-text').textContent = 'Conectado (Nube)';
-            voicePrompt.textContent = 'Agente Live en línea. Conexión WebSocket activa.';
+            networkStatus.querySelector('.status-text').textContent = 'Connected (Cloud)';
+            voicePrompt.textContent = 'Live Agent online. WebSocket connection active.';
             await connectWebSocket();
         }
     }
@@ -338,7 +598,7 @@ const FieldOpsApp = (function() {
     async function connectWebSocket() {
         if (ws && ws.readyState === WebSocket.OPEN) return;
         if (!currentInspection) {
-            alert("Seleccione una orden de trabajo antes de activar el modo Live Agent.");
+            alert("Please select a work order before activating Live Agent mode.");
             setConnectionMode('offline');
             return;
         }
@@ -365,10 +625,10 @@ const FieldOpsApp = (function() {
                 // Start capturing video frames at ~1 fps to stream visual context
                 startVideoCaptureStream();
                 
-                appendDialogue('agent', "[Live Mode] Conexión establecida. Puedes hablar con el auditor en tiempo real.");
+                appendDialogue('agent', "[Live Mode] Connection established. You can talk to the auditor in real-time.");
             } catch (err) {
                 console.error("Failed to initialize audio worklets:", err);
-                appendDialogue('agent', "[Live Mode] Error en inicialización de audio. Regresando a Offline.");
+                appendDialogue('agent', "[Live Mode] Audio initialization failed. Reverting to Offline.");
                 setConnectionMode('offline');
             }
         };
@@ -561,7 +821,7 @@ const FieldOpsApp = (function() {
 
         // Check if local QA passed
         if (qualityResults.blur === 'fail' || qualityResults.exposure === 'fail') {
-            const errorMsg = "La captura falló los controles de calidad en el borde. Por favor repita la foto.";
+            const errorMsg = "The capture failed edge quality checks. Please retake the photo.";
             appendDialogue('agent', errorMsg);
             FieldOpsVoiceConductor.announce(errorMsg);
             return;
@@ -576,10 +836,10 @@ const FieldOpsApp = (function() {
             
             // Check MAC prefix match
             if (!ocrMac.startsWith(currentWorkOrder.expected_mac_prefix)) {
-                macPrefixWarning.textContent = `⚠️ Prefijo MAC no coincide con el esperado: ${currentWorkOrder.expected_mac_prefix}`;
+                macPrefixWarning.textContent = `⚠️ MAC prefix does not match expected: ${currentWorkOrder.expected_mac_prefix}`;
                 macPrefixWarning.className = "help-text warning";
             } else {
-                macPrefixWarning.textContent = "✓ Prefijo MAC correcto";
+                macPrefixWarning.textContent = "✓ Correct MAC prefix";
                 macPrefixWarning.className = "help-text text-green";
             }
         }
@@ -590,6 +850,7 @@ const FieldOpsApp = (function() {
             step_id: activeStep.id,
             evidence_type: activeStep.type,
             image_url: `uploads/${currentWorkOrder.id}/${activeStep.id}/photo.jpg`,
+            image_data: base64Image,
             ocr_value: ocrMac,
             optical_power_dbm: activeStep.id === 'power-meter' ? -19.5 : null,
             quality_blur: qualityResults.blur,
@@ -599,23 +860,25 @@ const FieldOpsApp = (function() {
             compliance_justification: qualityResults.feedback
         };
         
-        await FieldOpsStorage.saveStep(stepData);
-        appendDialogue('user', `Foto tomada para: ${activeStep.name}`);
+        await FieldOpsStorage.saveStep(stepData); // Save to IndexedDB
+        appendDialogue('user', `Photo captured for: ${activeStep.name}`);
         
-        // Wait 1.5s to show quality results then advance step
+        // Wait 2s to show quality results then advance step
         setTimeout(async () => {
             qaResultsContainer.classList.add('hidden');
             
             if (activeStepIdx < INSPECTION_STEPS.length - 1) {
                 activeStepIdx++;
                 await renderSteps();
-                const nextMsg = `Evidencia guardada localmente. Siguiente paso: ${INSPECTION_STEPS[activeStepIdx].name}. ${INSPECTION_STEPS[activeStepIdx].desc}`;
+                await updatePhotoViewerForCurrentStep();
+                const nextMsg = `Evidence saved locally. Next step: ${INSPECTION_STEPS[activeStepIdx].name}. ${INSPECTION_STEPS[activeStepIdx].desc}`;
                 appendDialogue('agent', nextMsg);
                 FieldOpsVoiceConductor.announce(nextMsg);
             } else {
                 await renderSteps();
-                appendDialogue('agent', "¡Todos los pasos completados! Preparando el payload para la validación de auditoría final.");
-                FieldOpsVoiceConductor.announce("Inspección completada. Guardando reporte localmente.");
+                await updatePhotoViewerForCurrentStep();
+                appendDialogue('agent', "All steps completed! Preparing payload for final cloud audit validation.");
+                FieldOpsVoiceConductor.announce("Inspection completed. Saving report locally.");
                 await finalizeInspection();
             }
         }, 2000);
@@ -631,8 +894,8 @@ const FieldOpsApp = (function() {
         if (stepRecord) {
             stepRecord.ocr_value = mac;
             await FieldOpsStorage.saveStep(stepRecord);
-            appendDialogue('agent', `Dirección MAC confirmada: ${mac}`);
-            FieldOpsVoiceConductor.announce("Datos confirmados.");
+            appendDialogue('agent', `MAC address confirmed: ${mac}`);
+            FieldOpsVoiceConductor.announce("Data confirmed.");
         }
     }
 
@@ -644,21 +907,21 @@ const FieldOpsApp = (function() {
             id: currentInspection.id,
             work_order_id: currentInspection.work_order_id,
             technician_id: currentInspection.technician_id,
-            gps_lat: 40.416775,
-            gps_lon: -3.703790,
+            gps_lat: currentWorkOrder.gps_lat || 40.416775,
+            gps_lon: currentWorkOrder.gps_lon || -3.703790,
             steps: steps
         };
         
         jsonReport.textContent = JSON.stringify(payload, null, 2);
         
         // Save overall state locally
-        currentInspection.overall_verdict = 'APROBADO';
+        currentInspection.overall_verdict = 'APPROVED';
         currentInspection.status = 'synced';
         await FieldOpsStorage.saveInspection(currentInspection);
         
-        overallVerdict.textContent = "APROBADO";
+        overallVerdict.textContent = "APPROVED";
         overallVerdict.className = "overall-verdict-badge status-pass";
-        verdictDesc.textContent = "Validado localmente con éxito. Pendiente de sincronización definitiva.";
+        verdictDesc.textContent = "Successfully validated locally. Pending final cloud synchronization.";
         
         // Queue for background sync
         await FieldOpsStorage.queuePayload(payload);
@@ -675,11 +938,11 @@ const FieldOpsApp = (function() {
     async function handleManualSync() {
         const queue = await FieldOpsStorage.getSyncQueue();
         if (queue.length === 0) {
-            appendDialogue('agent', "No hay auditorías pendientes en la cola de sincronización.");
+            appendDialogue('agent', "No pending audits in the sync queue.");
             return;
         }
 
-        appendDialogue('agent', "Iniciando sincronización de cola con la nube...");
+        appendDialogue('agent', "Starting queue synchronization with cloud...");
         
         for (const item of queue) {
             try {
@@ -695,9 +958,9 @@ const FieldOpsApp = (function() {
                 
                 if (response.ok) {
                     await FieldOpsStorage.removeSyncQueue(item.id);
-                    dbGcsState.textContent = "Guardado (GCS)";
+                    dbGcsState.textContent = "Saved (GCS)";
                     dbGcsState.className = "sync-val status-green";
-                    dbBqState.textContent = "Inyectado (BQ)";
+                    dbBqState.textContent = "Injected (BQ)";
                     dbBqState.className = "sync-val status-green";
                     console.log("Synced inspection ID: ", item.id);
                 }
@@ -707,7 +970,7 @@ const FieldOpsApp = (function() {
         }
         
         await updateSyncQueueBadge();
-        appendDialogue('agent', "Auditorías sincronizadas y guardadas en Cloud Storage & BigQuery.");
+        appendDialogue('agent', "Audits synchronized and saved to Cloud Storage & BigQuery.");
     }
 
     // Append text to chat bubble list
