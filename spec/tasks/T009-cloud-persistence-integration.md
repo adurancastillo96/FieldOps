@@ -1,20 +1,21 @@
 # T009 — Cloud Persistence Integration
 
 ## Status
-- [ ] Pending  /  [ ] In Progress  /  [ ] ✅ Completed
+- [ ] Pending  /  [ ] In Progress  /  [x] ✅ Completed
 
 ## Description
 Connect the backend services to Google Cloud Platform databases. Implement image upload to Google Cloud Storage, final inspection audit report ingestion into BigQuery tables, and technician history logging into Google Cloud Firestore.
 
 ## Acceptance Criteria (DoD)
-- [ ] Uploaded image files save to GCS bucket structured paths: `gs://{bucket}/{work_order_id}/{step_id}/{timestamp}.jpg`.
-- [ ] final inspection JSON verdicts write to a partitioned BigQuery table, storing metadata, coordinates, overall verdict state, and step details.
-- [ ] Firestore models track technician active sessions and persist completed installation stats.
-- [ ] Session routing data, log details, and agent transcripts store inside Firestore collection logs.
-- [ ] Integrations verify connectivity, handling missing configurations gracefully with mock local drop-in saves.
+- [x] Uploaded image files save to GCS bucket structured paths: `gs://{bucket}/{work_order_id}/{step_id}/{timestamp}.jpg`.
+- [x] final inspection JSON verdicts write to a partitioned BigQuery table, storing metadata, coordinates, overall verdict state, and step details.
+- [x] Firestore models track technician active sessions and persist completed installation stats.
+- [x] Session routing data, log details, and agent transcripts store inside Firestore collection logs.
+- [x] Integrations verify connectivity, handling missing configurations gracefully with mock local drop-in saves.
 
 ## Dependencies
 - `T008 — Safety Validation Gates`
+- `T002 — Mock Data Source & REST APIs`
 
 ## Scope
 - Create: `src/services/gcs.py`
@@ -32,5 +33,14 @@ Connect the backend services to Google Cloud Platform databases. Implement image
 
 ## Implementation Notes
 - Files created:
+  - `src/services/gcs.py`
+  - `src/services/bigquery.py`
+  - `src/services/firestore.py`
+  - `tests/test_persistence.py`
+- Files modified:
+  - `src/routes/sync.py` (wired GCS upload and BQ ingestion during file synchronization)
+  - `src/routes/websocket.py` (wired Firestore logging of transcripts on turnComplete event detections)
 - Tests added:
+  - `tests/test_persistence.py` (3 test cases verifying local mock fallbacks for GCS file writes, BigQuery JSONL appends, and Firestore JSON document logs)
 - Notes:
+  - Mock fallbacks write files under `uploads/` directory to prevent test runs from crashing in environments where GCP ADC keys are not active. Ensure folders are purged during test teardowns.
