@@ -1,0 +1,235 @@
+openapi: 3.1.0
+info:
+  title: "[Project Name] API"
+  description: |
+    Machine-readable API specification for the project.
+    This file is the canonical source for API contracts.
+    See also: spec/API_SPEC.md for human-readable documentation.
+  version: 0.1.0
+  license:
+    name: MIT
+    identifier: MIT
+  contact:
+    name: "[Team Name]"
+
+servers:
+  - url: /api/v1
+    description: API v1 (default)
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  # Add more tags as resources are defined
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns the API health status. No authentication required.
+      tags: [Health]
+      security: []  # Public endpoint
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                required: [status, timestamp]
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # --- Add more paths as they are specified ---
+  # Example resource endpoint (uncomment and customize):
+  #
+  # /resources:
+  #   get:
+  #     operationId: listResources
+  #     summary: List resources
+  #     tags: [Resources]
+  #     parameters:
+  #       - $ref: "#/components/parameters/PageParam"
+  #       - $ref: "#/components/parameters/LimitParam"
+  #     responses:
+  #       "200":
+  #         description: Paginated list of resources
+  #         content:
+  #           application/json:
+  #             schema:
+  #               $ref: "#/components/schemas/PaginatedResponse"
+  #       "401":
+  #         $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the authentication endpoint
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+  schemas:
+    ErrorResponse:
+      type: object
+      description: Standard error response format (matches API_SPEC.md)
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              description: Human-readable error message
+              example: Invalid input provided
+            details:
+              type: object
+              description: Additional error context
+              additionalProperties: true
+          required: [code, message]
+      required: [error]
+
+    PaginatedResponse:
+      type: object
+      description: Standard paginated response envelope
+      properties:
+        data:
+          type: array
+          items: {}
+          description: Array of result items
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+              example: 1
+            limit:
+              type: integer
+              example: 20
+            total:
+              type: integer
+              example: 0
+          required: [page, limit, total]
+      required: [data, pagination]
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid input provided
+              details: {}
+
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid authentication token
+              details: {}
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: FORBIDDEN
+              message: Insufficient permissions for this resource
+              details: {}
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: NOT_FOUND
+              message: The requested resource was not found
+              details: {}
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: CONFLICT
+              message: Resource already exists or conflicts with current state
+              details: {}
+
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: RATE_LIMITED
+              message: Too many requests, please try again later
+              details: {}
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred
+              details: {}
