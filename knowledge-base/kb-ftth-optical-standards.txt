@@ -1,0 +1,6 @@
+FTTH Optical Power Standards:
+- Standard compliance threshold for ONT/ONU optical power levels: -28.0 dBm to -8.0 dBm (inclusive).
+- Ideal optical power levels: -22.0 dBm to -15.0 dBm.
+- Warning threshold (Optical level low): -27.9 dBm to -25.0 dBm.
+- Failure threshold (Optical power too low): below -28.0 dBm (requires technician to clean connector or verify splitters).
+- Failure threshold (Optical power too high): above -8.0 dBm (requires attenuation).

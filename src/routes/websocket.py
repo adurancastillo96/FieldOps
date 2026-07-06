@@ -155,6 +155,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     if event_dict.get("turnComplete") or event_dict.get("turn_complete"):
                         entry = log_ai_interaction(_user_said, _agent_said)
                         if entry:
+                            from src.services.firestore import save_session_log
+                            save_session_log(
+                                session_id=session_id,
+                                technician_id=user_id,
+                                log_entry=entry
+                            )
                             await websocket.send_text(json.dumps({
                                 "type": "ai_log",
                                 "entry": entry,

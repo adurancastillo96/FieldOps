@@ -4,7 +4,10 @@ import shutil
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from pydantic import BaseModel, Field, ValidationError
+
 from src.routes.work_orders import verify_mock_token
+from src.services.gcs import upload_image
+from src.services.bigquery import insert_inspection_ledger
 
 router = APIRouter(prefix="/sync", tags=["Synchronization"])
 
@@ -33,7 +36,7 @@ async def sync_inspection(
 ):
     """
     Handles synchronization of offline-captured inspections.
-    Validates payload JSON and stores uploaded images locally.
+    Validates payload JSON, uploads images to GCS, and ledgers in BigQuery.
     """
     # 1. Parse and validate JSON payload against Pydantic schema
     try:
@@ -53,10 +56,9 @@ async def sync_inspection(
     # 2. Assert file size constraints (Max 20MB total)
     total_size = 0
     for file in files:
-        # Read a small chunk to ensure file size is populated if not set
         file.file.seek(0, os.SEEK_END)
         file_size = file.file.tell()
-        file.file.seek(0)  # Reset pointer
+        file.file.seek(0)
         total_size += file_size
         
     if total_size > 20 * 1024 * 1024:
@@ -65,47 +67,71 @@ async def sync_inspection(
             detail="Sync payload size exceeds 20MB limit"
         )
 
-    # 3. Save uploaded evidence files to uploads directory
+    # 3. Process and upload files to Cloud Storage (GCS)
     valid_step_ids = {step.step_id for step in sync_data.steps}
+    uploaded_gcs_paths = {}
     
     for file in files:
-        # Extract step_id from the file name base (e.g. "site-overview.jpg" -> "site-overview")
         step_id = os.path.splitext(file.filename)[0]
         if step_id not in valid_step_ids:
-            # Fallback: if filename doesn't match step_id, skip or log
             continue
             
-        dest_dir = os.path.join("uploads", sync_data.work_order_id, step_id)
-        os.makedirs(dest_dir, exist_ok=True)
-        dest_path = os.path.join(dest_dir, file.filename)
+        # Read file bytes for uploading
+        file_bytes = await file.read()
         
-        try:
-            with open(dest_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to write file to disk: {str(e)}"
-            )
+        # Upload using GCS service
+        gcs_uri = upload_image(
+            work_order_id=sync_data.work_order_id,
+            step_id=step_id,
+            file_bytes=file_bytes,
+            filename=file.filename
+        )
+        uploaded_gcs_paths[step_id] = gcs_uri
 
     # 4. Run compliance checks for final verdict response
     verdict = "approved"
     details = "All quality and compliance gates passed successfully."
     
     for step in sync_data.steps:
-        # Quality failure check
         if step.quality_blur == "fail" or step.quality_exposure == "fail" or step.quality_framing == "fail":
             verdict = "rejected"
             details = f"Inspection rejected: Quality check failed on step {step.step_id}."
             break
             
-        # Optical power check range check (-28.0 to -8.0 dBm)
         if step.step_id == "power-meter" and step.optical_power_dbm is not None:
             power = step.optical_power_dbm
             if power < -28.0 or power > -8.0:
                 verdict = "rejected"
                 details = f"Inspection rejected: Optical power of {power} dBm is out of compliance range [-28.0, -8.0]."
                 break
+
+    # 5. Build final structured audit data and ingest in BigQuery
+    steps_payload = []
+    for step in sync_data.steps:
+        steps_payload.append({
+            "step_id": step.step_id,
+            "evidence_type": step.evidence_type,
+            "ocr_value": step.ocr_value,
+            "optical_power_dbm": step.optical_power_dbm,
+            "quality_blur": step.quality_blur,
+            "quality_exposure": step.quality_exposure,
+            "quality_framing": step.quality_framing,
+            "image_gcs_uri": uploaded_gcs_paths.get(step.step_id)
+        })
+        
+    inspection_record = {
+        "id": sync_data.id,
+        "work_order_id": sync_data.work_order_id,
+        "technician_id": sync_data.technician_id,
+        "gps_lat": sync_data.gps_lat,
+        "gps_lon": sync_data.gps_lon,
+        "overall_verdict": verdict,
+        "details": details,
+        "steps": steps_payload
+    }
+    
+    # Ingest record in BQ
+    insert_inspection_ledger(inspection_record)
 
     return {
         "status": "synced",

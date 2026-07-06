@@ -1,0 +1,5 @@
+FTTH Installation & Mounting Standards:
+- ONT fiber patch cord bend radius must be at least 30mm (or 3cm). Bending below this radius causes macrobending optical loss.
+- ONT label placement: The label containing barcode, MAC address, and Serial number must be fully visible and legible. Faceward scan close-up is mandatory.
+- Mounting: The ONT must be securely mounted on the wall or place bracket. Loose cables must be tied using standard zip ties.
+- Safety: Laser protection caps must remain on unused ports. Never look directly into the fiber connector tip.
