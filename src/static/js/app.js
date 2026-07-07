@@ -5,14 +5,12 @@ const FieldOpsApp = (function() {
     const API_BASE = '/api/v1';
     const AUTH_HEADER = 'Bearer test-token-123';
     
-    // Workflow steps definition (Translated to English)
+    // Workflow steps definition (Updated for Photo Audit)
     const INSPECTION_STEPS = [
-        { id: 'site-overview', name: 'Installation Environment', desc: 'Capture a general photo of the workspace area.', type: 'photo', mandatory: true },
-        { id: 'ont-before', name: 'Before Installation', desc: 'Capture a photo of the optical rosette before mounting the ONT.', type: 'photo', mandatory: true },
-        { id: 'ont-after-frontal', name: 'ONT Frontal', desc: 'Capture a frontal photo of the ONT already mounted and turned on.', type: 'photo', mandatory: true },
-        { id: 'ont-after-closeup', name: 'ONT Label (Detail)', desc: 'Capture a close-up photo of the label with the barcode and MAC.', type: 'photo', mandatory: true },
-        { id: 'power-meter', name: 'Optical Power', desc: 'Capture a photo of the Power Meter reading or enter the value.', type: 'reading', mandatory: true },
-        { id: 'panoramic', name: 'Complete Installation', desc: 'Capture a panoramic photo of the rosette, patch cord, and final ONT.', type: 'photo', mandatory: true }
+        { id: 'bend_radius', name: 'Fiber Bend Radius', desc: 'Verify and check for pinched fiber loops or tight bends below 30mm.', type: 'photo', mandatory: true },
+        { id: 'optical_power', name: 'Optical Power', desc: 'Capture optical power meter display showing dBm level.', type: 'photo', mandatory: true },
+        { id: 'device_label', name: 'Device Label (Detail)', desc: 'Capture ONT detail label containing MAC address and serial number.', type: 'photo', mandatory: true },
+        { id: 'labeling_enclosure', name: 'Labeling & Enclosure', desc: 'Verify enclosure box is closed and labeling details are attached.', type: 'photo', mandatory: true }
     ];
 
     // App state variables
@@ -176,8 +174,7 @@ const FieldOpsApp = (function() {
         await renderSteps();
         btnCapture.disabled = false;
         
-        // Start live camera viewfinder
-        await FieldOpsCamera.start();
+        // Camera viewfinder remains hidden by default. Click 'Toggle Camera' to open it.
         
         // If map tab active or when work order changes, redraw map
         drawRouteMap();
@@ -197,7 +194,7 @@ const FieldOpsApp = (function() {
         
         INSPECTION_STEPS.forEach((step, idx) => {
             const stepData = stepsData.find(s => s.step_id === step.id);
-            const isCompleted = !!stepData;
+            const isCompleted = !!stepData && stepData.compliance_verdict === 'pass';
             const isActive = idx === activeStepIdx;
             
             const row = document.createElement('div');
@@ -224,7 +221,7 @@ const FieldOpsApp = (function() {
         activeStepTitle.textContent = `${activeStepIdx + 1}. ${activeStep.name}`;
         
         // Show/hide specific widgets
-        if (activeStep.id === 'ont-after-closeup') {
+        if (activeStep.id === 'device_label') {
             ocrVerificationBox.classList.remove('hidden');
         } else {
             ocrVerificationBox.classList.add('hidden');
@@ -263,6 +260,8 @@ const FieldOpsApp = (function() {
                 if (targetTab === 'map-tab') {
                     // Redraw map on canvas
                     setTimeout(drawRouteMap, 50);
+                } else if (targetTab === 'supervisor-tab') {
+                    setTimeout(updateMarkdownReport, 50);
                 }
             });
         });
@@ -453,20 +452,90 @@ const FieldOpsApp = (function() {
     }
 
     // Handle Manual Text message from Claude UI chat panel
-    function handleManualChatSend() {
+    async function handleManualChatSend() {
         const text = chatTextInput.value.trim();
         if (!text) return;
         
         appendDialogue('user', text);
         chatTextInput.value = '';
         
-        if (connectionMode === 'online' && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: 'text',
-                content: text
-            }));
-        } else {
-            // Local fallback analyzer
+        if (!currentWorkOrder) {
+            appendDialogue('agent', "Please select a work order before sending messages.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${currentWorkOrder.id}/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': AUTH_HEADER
+                },
+                body: JSON.stringify({ message: text })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                appendDialogue('agent', data.reply);
+                FieldOpsVoiceConductor.announce(data.reply);
+                
+                // Process override actions
+                if (data.action && data.action.type === 'override_step') {
+                    const stepId = data.action.step_id;
+                    const status = data.action.status;
+                    const justification = data.action.justification;
+                    
+                    const stepRecord = await FieldOpsStorage.getStep(currentInspection.id, stepId);
+                    if (stepRecord) {
+                        stepRecord.compliance_verdict = 'pass';
+                        stepRecord.compliance_justification = `Overridden: ${justification}`;
+                        await FieldOpsStorage.saveStep(stepRecord);
+                    } else {
+                        const stepData = {
+                            id: `${currentInspection.id}_${stepId}`,
+                            inspection_id: currentInspection.id,
+                            step_id: stepId,
+                            evidence_type: 'photo',
+                            image_url: null,
+                            image_data: null,
+                            ocr_value: null,
+                            serial_number: null,
+                            optical_power_dbm: null,
+                            quality_blur: 'pass',
+                            quality_exposure: 'pass',
+                            quality_framing: 'pass',
+                            compliance_verdict: 'pass',
+                            compliance_justification: `Overridden: ${justification}`
+                        };
+                        await FieldOpsStorage.saveStep(stepData);
+                    }
+                    
+                    await renderSteps();
+                    await updatePhotoViewerForCurrentStep();
+                    
+                    setTimeout(async () => {
+                        if (activeStepIdx < INSPECTION_STEPS.length - 1) {
+                            activeStepIdx++;
+                            await renderSteps();
+                            await updatePhotoViewerForCurrentStep();
+                            const nextMsg = `Next step: ${INSPECTION_STEPS[activeStepIdx].name}. ${INSPECTION_STEPS[activeStepIdx].desc}`;
+                            appendDialogue('agent', nextMsg);
+                            FieldOpsVoiceConductor.announce(nextMsg);
+                        } else {
+                            await renderSteps();
+                            await updatePhotoViewerForCurrentStep();
+                            appendDialogue('agent', "All steps completed! Check the Markdown Report tab to download your installation report.");
+                            FieldOpsVoiceConductor.announce("All steps completed.");
+                            await finalizeInspection();
+                        }
+                    }, 1500);
+                }
+            } else {
+                appendDialogue('agent', "Failed to contact chat assistant.");
+            }
+        } catch (err) {
+            console.error("Chat error:", err);
+            // Local fallback simulation if offline
             simulateOfflineTextCommand(text);
         }
     }
@@ -518,7 +587,73 @@ const FieldOpsApp = (function() {
             if (e.key === 'Enter') handleManualChatSend();
         });
 
-        // Analytics query submission
+        // Toggle camera viewfinder
+        const btnToggleCamera = document.getElementById('btn-toggle-camera');
+        const viewfinderContainer = document.getElementById('viewfinder-container');
+        if (btnToggleCamera && viewfinderContainer) {
+            btnToggleCamera.addEventListener('click', async () => {
+                const isHidden = viewfinderContainer.classList.contains('hidden');
+                if (isHidden) {
+                    viewfinderContainer.classList.remove('hidden');
+                    btnCapture.classList.remove('hidden');
+                    btnRetake.classList.remove('hidden');
+                    await FieldOpsCamera.start();
+                } else {
+                    viewfinderContainer.classList.add('hidden');
+                    btnCapture.classList.add('hidden');
+                    btnRetake.classList.add('hidden');
+                    FieldOpsCamera.stop();
+                }
+            });
+        }
+
+        // Drag & Drop file uploader listeners
+        const fileUploader = document.getElementById('file-uploader');
+        const dragDropZone = document.getElementById('drag-drop-zone');
+        if (dragDropZone && fileUploader) {
+            dragDropZone.addEventListener('click', () => fileUploader.click());
+            fileUploader.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) processUploadFile(file);
+            });
+            dragDropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dragDropZone.style.background = 'rgba(6, 182, 212, 0.1)';
+                dragDropZone.style.borderColor = 'var(--accent-cyan)';
+            });
+            dragDropZone.addEventListener('dragleave', () => {
+                dragDropZone.style.background = 'rgba(255, 255, 255, 0.02)';
+                dragDropZone.style.borderColor = 'var(--border-color)';
+            });
+            dragDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dragDropZone.style.background = 'rgba(255, 255, 255, 0.02)';
+                dragDropZone.style.borderColor = 'var(--border-color)';
+                const file = e.dataTransfer.files[0];
+                if (file) processUploadFile(file);
+            });
+        }
+
+        // Download report button handler
+        const btnDownload = document.getElementById('btn-download-report');
+        if (btnDownload) {
+            btnDownload.addEventListener('click', () => {
+                if (!currentWorkOrder) return;
+                const reportPreview = document.getElementById('report-preview');
+                const mdText = reportPreview.textContent;
+                const blob = new Blob([mdText], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentWorkOrder.id}_report.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Analytics query submission (Retained for compatibility)
         const btnAskAnalytics = document.getElementById('btn-ask-analytics');
         const analyticsInput = document.getElementById('analytics-input');
         const sqlResultContainer = document.getElementById('sql-result-container');
@@ -528,7 +663,6 @@ const FieldOpsApp = (function() {
         btnAskAnalytics.addEventListener('click', async () => {
             const val = analyticsInput.value.trim();
             if (!val) return;
-            
             try {
                 const response = await fetch(`${API_BASE}/analytics/query`, {
                     method: 'POST',
@@ -538,7 +672,6 @@ const FieldOpsApp = (function() {
                     },
                     body: JSON.stringify({ question: val })
                 });
-                
                 if (response.ok) {
                     const data = await response.json();
                     sqlQueryDisplay.textContent = data.sql;
@@ -554,6 +687,24 @@ const FieldOpsApp = (function() {
         window.ORION_relayoutModals = function() {
             console.log("Relayouting panels...");
         };
+    }
+
+    async function updateMarkdownReport() {
+        if (!currentWorkOrder) return;
+        const btnDownload = document.getElementById('btn-download-report');
+        const reportPreview = document.getElementById('report-preview');
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${currentWorkOrder.id}/report`, {
+                headers: { 'Authorization': AUTH_HEADER }
+            });
+            if (response.ok) {
+                const mdText = await response.text();
+                if (reportPreview) reportPreview.textContent = mdText;
+                if (btnDownload) btnDownload.disabled = false;
+            }
+        } catch (err) {
+            console.error("Failed to load markdown report:", err);
+        }
     }
 
     // Refresh aggregated metrics cards on supervisor panel load
@@ -787,101 +938,135 @@ const FieldOpsApp = (function() {
         }
     }
 
-    // Real edge AI capture execution
-    async function handleCapture() {
+    // Uploader helper to post photos to backend and audit them
+    async function uploadStepPhoto(base64Image) {
         if (!currentInspection) return;
         const activeStep = INSPECTION_STEPS[activeStepIdx];
         
-        console.log("Capturing photo for step: ", activeStep.id);
+        appendDialogue('agent', `Analyzing photo for ${activeStep.name}...`);
         
-        // Capture frame from live viewfinder stream
-        const base64Image = FieldOpsCamera.capture();
-        
-        // Run edge quality evaluation (simulates local ONNX checks)
-        const qualityResults = await FieldOpsEdgeAI.evaluateQuality(base64Image, activeStep.id);
-        
-        // Update Edge QA display
-        const qaResultsContainer = document.getElementById('qa-results-container');
-        const qaBlur = document.getElementById('qa-blur').querySelector('.qa-status');
-        const qaExposure = document.getElementById('qa-exposure').querySelector('.qa-status');
-        const qaFraming = document.getElementById('qa-framing').querySelector('.qa-status');
-        const qaFeedback = document.getElementById('qa-feedback');
-        
-        qaBlur.textContent = qualityResults.blur.toUpperCase();
-        qaBlur.className = `qa-status ${qualityResults.blur}`;
-        
-        qaExposure.textContent = qualityResults.exposure.toUpperCase();
-        qaExposure.className = `qa-status ${qualityResults.exposure}`;
-        
-        qaFraming.textContent = qualityResults.framing.toUpperCase();
-        qaFraming.className = `qa-status ${qualityResults.framing}`;
-        
-        qaFeedback.textContent = qualityResults.feedback;
-        qaResultsContainer.classList.remove('hidden');
-
-        // Check if local QA passed
-        if (qualityResults.blur === 'fail' || qualityResults.exposure === 'fail') {
-            const errorMsg = "The capture failed edge quality checks. Please retake the photo.";
-            appendDialogue('agent', errorMsg);
-            FieldOpsVoiceConductor.announce(errorMsg);
-            return;
-        }
-
-        // Run OCR if active step requires device label scanning
-        let ocrMac = null;
-        if (activeStep.id === 'ont-after-closeup') {
-            const ocrResults = await FieldOpsEdgeAI.runOCR(base64Image, currentWorkOrder.expected_mac_prefix);
-            ocrMac = ocrResults.mac;
-            macInput.value = ocrMac;
-            
-            // Check MAC prefix match
-            if (!ocrMac.startsWith(currentWorkOrder.expected_mac_prefix)) {
-                macPrefixWarning.textContent = `⚠️ MAC prefix does not match expected: ${currentWorkOrder.expected_mac_prefix}`;
-                macPrefixWarning.className = "help-text warning";
-            } else {
-                macPrefixWarning.textContent = "✓ Correct MAC prefix";
-                macPrefixWarning.className = "help-text text-green";
-            }
-        }
-        
-        const stepData = {
-            id: `${currentInspection.id}_${activeStep.id}`,
-            inspection_id: currentInspection.id,
+        const payload = {
             step_id: activeStep.id,
-            evidence_type: activeStep.type,
-            image_url: `uploads/${currentWorkOrder.id}/${activeStep.id}/photo.jpg`,
             image_data: base64Image,
-            ocr_value: ocrMac,
-            optical_power_dbm: activeStep.id === 'power-meter' ? -19.5 : null,
-            quality_blur: qualityResults.blur,
-            quality_exposure: qualityResults.exposure,
-            quality_framing: qualityResults.framing,
-            compliance_verdict: 'pass',
-            compliance_justification: qualityResults.feedback
+            gps_lat: currentWorkOrder.gps_lat,
+            gps_lon: currentWorkOrder.gps_lon
         };
         
-        await FieldOpsStorage.saveStep(stepData); // Save to IndexedDB
-        appendDialogue('user', `Photo captured for: ${activeStep.name}`);
-        
-        // Wait 2s to show quality results then advance step
-        setTimeout(async () => {
-            qaResultsContainer.classList.add('hidden');
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${currentWorkOrder.id}/upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': AUTH_HEADER
+                },
+                body: JSON.stringify(payload)
+            });
             
-            if (activeStepIdx < INSPECTION_STEPS.length - 1) {
-                activeStepIdx++;
-                await renderSteps();
-                await updatePhotoViewerForCurrentStep();
-                const nextMsg = `Evidence saved locally. Next step: ${INSPECTION_STEPS[activeStepIdx].name}. ${INSPECTION_STEPS[activeStepIdx].desc}`;
-                appendDialogue('agent', nextMsg);
-                FieldOpsVoiceConductor.announce(nextMsg);
-            } else {
-                await renderSteps();
-                await updatePhotoViewerForCurrentStep();
-                appendDialogue('agent', "All steps completed! Preparing payload for final cloud audit validation.");
-                FieldOpsVoiceConductor.announce("Inspection completed. Saving report locally.");
-                await finalizeInspection();
+            if (!response.ok) {
+                throw new Error(`Upload failed with status ${response.status}`);
             }
-        }, 2000);
+            
+            const result = await response.json();
+            console.log("Upload result:", result);
+            const verdict = result.verdict;
+            
+            // Render OCR box data if device_label
+            if (activeStep.id === 'device_label' && verdict.compliance.extracted_data) {
+                const ocrMac = verdict.compliance.extracted_data.mac_address || '';
+                macInput.value = ocrMac;
+                if (!ocrMac.startsWith(currentWorkOrder.expected_mac_prefix)) {
+                    macPrefixWarning.textContent = `⚠️ MAC prefix does not match expected: ${currentWorkOrder.expected_mac_prefix}`;
+                    macPrefixWarning.className = "help-text warning";
+                } else {
+                    macPrefixWarning.textContent = "✓ Correct MAC prefix";
+                    macPrefixWarning.className = "help-text text-green";
+                }
+            }
+
+            // Save step to Local indexedDB
+            const stepData = {
+                id: `${currentInspection.id}_${activeStep.id}`,
+                inspection_id: currentInspection.id,
+                step_id: activeStep.id,
+                evidence_type: 'photo',
+                image_url: result.photo_url || `uploads/${currentWorkOrder.id}/${activeStep.id}/photo.jpg`,
+                image_data: base64Image,
+                ocr_value: verdict.compliance.extracted_data?.mac_address || null,
+                serial_number: verdict.compliance.extracted_data?.serial_number || null,
+                optical_power_dbm: verdict.compliance.extracted_data?.optical_power_dbm || null,
+                quality_blur: verdict.quality.blur,
+                quality_exposure: verdict.quality.exposure,
+                quality_framing: verdict.quality.overall || 'pass',
+                compliance_verdict: verdict.compliance.overall,
+                compliance_justification: verdict.compliance.details
+            };
+            
+            await FieldOpsStorage.saveStep(stepData);
+            
+            await renderSteps();
+            await updatePhotoViewerForCurrentStep();
+            
+            if (verdict.compliance.overall === 'pass') {
+                const passMsg = `✓ Step "${activeStep.name}" PASSED: ${verdict.compliance.details}`;
+                appendDialogue('agent', passMsg);
+                FieldOpsVoiceConductor.announce(`Step ${activeStep.name} passed.`);
+                
+                // Auto-advance
+                if (activeStepIdx < INSPECTION_STEPS.length - 1) {
+                    activeStepIdx++;
+                    await renderSteps();
+                    await updatePhotoViewerForCurrentStep();
+                    const nextMsg = `Next step: ${INSPECTION_STEPS[activeStepIdx].name}. ${INSPECTION_STEPS[activeStepIdx].desc}`;
+                    appendDialogue('agent', nextMsg);
+                    FieldOpsVoiceConductor.announce(nextMsg);
+                } else {
+                    appendDialogue('agent', "All steps completed! Check the Markdown Report tab to download your installation report.");
+                    FieldOpsVoiceConductor.announce("All steps completed.");
+                    await finalizeInspection();
+                }
+            } else {
+                const failMsg = `⚠️ Step "${activeStep.name}" FAILED compliance: ${verdict.compliance.details}. Provide a chat override justification or upload another photo.`;
+                appendDialogue('agent', failMsg);
+                FieldOpsVoiceConductor.announce(`Step ${activeStep.name} failed compliance.`);
+            }
+        } catch (error) {
+            console.error("Error uploading photo:", error);
+            appendDialogue('agent', `❌ Photo upload failed due to a connection error. Please try again.`);
+        }
+    }
+
+    function processUploadFile(file) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64Image = e.target.result;
+            // Update preview tab
+            const imgElement = document.getElementById('photo-viewer-img');
+            const placeholder = document.getElementById('photo-viewer-placeholder');
+            if (imgElement && placeholder) {
+                imgElement.src = base64Image;
+                imgElement.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+            }
+            await uploadStepPhoto(base64Image);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Camera snapshot click handler
+    async function handleCapture() {
+        if (!currentInspection) return;
+        const base64Image = FieldOpsCamera.capture();
+        
+        // Show local preview immediately
+        const imgElement = document.getElementById('photo-viewer-img');
+        const placeholder = document.getElementById('photo-viewer-placeholder');
+        if (imgElement && placeholder) {
+            imgElement.src = base64Image;
+            imgElement.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+        }
+        
+        await uploadStepPhoto(base64Image);
     }
 
     // Confirm local OCR edits
@@ -890,7 +1075,7 @@ const FieldOpsApp = (function() {
         const mac = macInput.value;
         console.log("Confirming OCR changes: ", mac);
         
-        const stepRecord = await FieldOpsStorage.getStep(currentInspection.id, 'ont-after-closeup');
+        const stepRecord = await FieldOpsStorage.getStep(currentInspection.id, 'device_label');
         if (stepRecord) {
             stepRecord.ocr_value = mac;
             await FieldOpsStorage.saveStep(stepRecord);
@@ -926,6 +1111,7 @@ const FieldOpsApp = (function() {
         // Queue for background sync
         await FieldOpsStorage.queuePayload(payload);
         await updateSyncQueueBadge();
+        await updateMarkdownReport();
     }
 
     // Sync queue size badge update

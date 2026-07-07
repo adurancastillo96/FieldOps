@@ -1,62 +1,42 @@
-# Technical Plan
+# Technical Plan (New Cycle)
 
 Generated in Phase 2 of the SDD cycle by the architect agent.
 
 ## Overview
-The technical implementation follows a modular progression, prioritizing the Edge PWA capability and offline workflow first, followed by the real-time backend agentic pipeline, safety validation rules, persistence layers, and analytics.
+The implementation transitions the application from a WebSocket-based streaming co-pilot to a stateless, RESTful, guided photo audit and documentation companion. It focuses on guided photo uploads, automated cloud vision compliance auditing (via Gemini 2.5 Flash), local speech-to-text dictation, and direct browser-based Markdown report generation.
 
 ## Components
 
 | Component | Description | Dependencies | Complexity |
 |-----------|-------------|--------------|------------|
-| Setup & Scaffold | Establish backend FastAPI structure, Hatch config, frontend static shell | None | Low |
-| PWA Core & DB | Build offline-first PWA, IndexedDB storage engine, Service Worker caching | Setup & Scaffold | Medium |
-| Local Edge AI | Integrate ONNX Runtime Web (blur/exposure/PaddleOCR) and Web Speech API | PWA Core & DB | High |
-| REST API Sync | Build REST API endpoints for mock work orders and background payload synchronization | Setup & Scaffold | Low |
-| ADK & WebSocket | Implement real-time WebSocket connection to Gemini Live Native Audio via Google ADK | Setup & Scaffold | High |
-| Orchestrator & Sub-agents | Define the Root Orchestrator and specialist sub-agents (Quality, Compliance, OCR) | ADK & WebSocket | Medium |
-| Grounding & Safety Gates | Build callbacks, Pydantic validation gates, and LLM self-correction logic | Orchestrator & Sub-agents | Medium |
-| Cloud Persistence | Integrate GCS image upload, BigQuery ingestion, and Firestore session history | REST API Sync, Safety Gates | Medium |
-| Analytics & Dashboard | Develop supervisor view and conversational analytics agent for BigQuery querying | Cloud Persistence | Medium |
+| Claude Layout Redesign | Establish the split layout: left-side conversational feed (text-only + speech-to-text input), right-side guided tabs. | None | Low |
+| Speech Dictation | Implement local browser-based `webkitSpeechRecognition` to dictate chat entries hands-free. | None | Medium |
+| REST Upload API | Build a FastAPI endpoint to upload step photos, save to GCS, and trigger vision audits. | None | Medium |
+| REST Chat & Agents | Build a chat endpoint using standard ADK Orchestrator and Vision Auditor sub-agents (Quality + Compliance). | REST Upload API | High |
+| Report Generator | Build Markdown compiler and download trigger in the frontend and backend. | REST Chat & Agents | Low |
+| Verification Tests | Verify image analysis prompts, OCR outputs, MAC prefix checks, and Markdown generation. | Setup | Medium |
 
 ## Implementation Order
 
-1. **Setup & Scaffold**: Establish workspace environment. Initialize files, virtual environments, configurations, and core structures.
-2. **PWA Core & Offline Storage**: Build IndexedDB service and step-by-step workflow navigation engine, enabling capture operations offline.
-3. **REST API Gateway**: Expose FastAPI mock work orders endpoint and sync sync endpoint to receive payloads.
-4. **Local Edge AI**: Package ONNX models for blur/exposure assessment and OCR. Implement local speech command parsing for offline voice conduction.
-5. **WebSocket & ADK Setup**: Construct bidirectional audio and JSON websocket pipeline to run the Live Agent conversation.
-6. **Orchestrator & Sub-Agents**: Configure Google ADK agent roles, tool registrations, and instructions concatenated with static KB files.
-7. **Grounding & Safety Gates**: Program before/after tool callback hooks and deterministic python verification policy gates.
-8. **Cloud Persistence**: Link GCS, BigQuery, and Firestore database services with IAM credentials.
-9. **Supervisor Analytics**: Add dashboard panel and natural language to SQL analytics agent.
-10. **Testing & Validation**: Author unit tests for PWA and backend, execute test suites, and execute code reviews.
+1. **Claude UI Redesign**: Re-arrange `index.html` and `styles.css` to represent the English-only dual-pane layout with tabs for Camera/Upload, Photo Preview, Route Map, Audit Verdicts, and Markdown Report.
+2. **Speech Dictation Helper**: Bind the microphone button to browser-based `webkitSpeechRecognition`, appending transcriptions directly to the text input box.
+3. **REST Upload & Audit Endpoint**: Implement `POST /api/v1/work-orders/{id}/upload`. It accepts the step photo, saves it to mock/local storage (or GCS), and triggers the ADK audit pipeline.
+4. **Agent Cognitive Refactoring**: Update `orchestrator.py`, `quality_auditor.py`, and `compliance_advisor.py` to evaluate static step photos via the standard Gemini API and return structured JSON verdicts.
+5. **REST Chat Endpoint**: Implement `POST /api/v1/work-orders/{id}/chat` where the technician can text-chat with the orchestrator to log deviations or ask questions.
+6. **Markdown Report Download**: Update the PWA to compile inspection metadata and verdicts into a structured Markdown document and trigger direct local downloads.
+7. **Verification**: Create unit tests verifying REST uploader, vision audits, OCR extraction, and deviation overrides.
 
 ## Technical Decisions
 
 | Decision | Choice | Rationale | Alternatives Considered |
 |----------|--------|-----------|------------------------|
-| Frontend Framework | Vanilla JS (IIFE modules) | Zero-build simplicity, maximum control over WASM/WebGPU compilation, fast load times. | React/Vite (adds build step and bundle weight) |
-| Cloud Vision Engine | Gemini 1.5 Flash Vision | Direct multimodal integration, lower pipeline complexity for V1, flexible grounding. | NVIDIA NIM (DINOv2) on GKE (Deferred to Phase 2) |
-| Audio Format | 16kHz Mono Input, 24kHz Mono Output | Required by Vertex AI Live API / Native Audio specifications, balances bandwidth. | Opus compression (adds client/server codec burden) |
-| State Management | PWA client-side step engine | Prevents workflow loss on connection drop, ensures offline parity. | Server-driven workflow state (requires constant connectivity) |
+| Communication Protocol | HTTPS REST (POST/GET) | Highly reliable on patchy networks, avoids WebSocket handshake overhead and connection drops. | WebSockets (adds stateful connection complexity) |
+| Voice Input | Web Speech API | Local browser-based transcription avoids uploading raw audio packets, saving bandwidth and cloud transit latency. | Whisper ONNX Web / Cloud Whisper API |
+| Report Output | Downloadable Markdown | Simple, text-based, readable on all platforms, easily parsed, zero server-side rendering burden. | ReportLab PDF (adds dependency bloat) |
 
 ## Risks
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
-| Edge AI WASM memory limits | High | Medium | Use quantized lightweight models (YOLO11n, Whisper-tiny) and test memory allocation limits in Android browsers. |
-| High voice loop latency | Medium | Medium | Buffer audio to 100ms chunks, leverage Gemini 2.5 Flash Native Audio direct dialog (avoid cascade of TTS/STT steps). |
-| Grounding failure / hallucinations | High | Low | Implement before-tool whitelist callbacks and Pydantic validation schemas to catch and self-correct invalid agent arguments. |
-| Background Sync fail due to OS sleeping | Medium | High | Persist records locally inside IndexedDB indefinitely. Implement an manual retry sync button in PWA UI. |
-
-## Estimated Effort
-
-| Phase | Estimate | Notes |
-|-------|----------|-------|
-| Setup & Scaffold | 1 day | Directory initialization, dependency pinning, workspace configs. |
-| Edge PWA & Local AI | 4 days | Service workers, IndexedDB cache, camera controls, local ONNX runtimes. |
-| Backend & WebSocket | 3 days | FastAPI WebSocket loops, ADK LiveRequestQueue integrations. |
-| Multi-agent & Safety Gates | 3 days | Orchestrator definitions, sub-agent logic, Pydantic gate checks. |
-| Persistent DB & Analytics | 2 days | GCS storage, BigQuery table partition schema, Firestore history. |
-| Testing & Verification | 2 days | Integration tests, code formatting, security reviews. |
+| Cloud Vision Audit Latency | Medium | Medium | Perform visual checks concurrently and keep Gemini instructions short to ensure response returns under 3.5s. |
+| Network Outage during Upload | High | Medium | Store photo payloads locally in IndexedDB and allow the technician to manually trigger upload retries when back online. |

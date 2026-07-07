@@ -47,43 +47,24 @@ const FieldOpsVoiceConductor = (function() {
         };
 
         recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript.toLowerCase();
+            const transcript = event.results[0][0].transcript;
             console.log("Speech recognized: ", transcript);
-            processVoiceCommand(transcript);
+            
+            // Trigger haptic feedback vibration
+            if (navigator.vibrate) {
+                navigator.vibrate(100);
+            }
+            
+            const chatInput = document.getElementById('chat-text-input');
+            if (chatInput) {
+                if (chatInput.value) {
+                    chatInput.value += " " + transcript;
+                } else {
+                    chatInput.value = transcript;
+                }
+                chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         };
-    }
-
-    // Command Intent Router
-    function processVoiceCommand(text) {
-        // Append user transcript to UI log if function exists
-        if (window.FieldOpsApp && typeof window.FieldOpsApp.appendDialogue === 'function') {
-            window.FieldOpsApp.appendDialogue('user', text);
-        } else {
-            console.log("User Speech bubble: ", text);
-        }
-
-        // Trigger haptic feedback vibration
-        if (navigator.vibrate) {
-            navigator.vibrate(100);
-        }
-
-        // Simple keyword matcher (Conductor Mode)
-        if (text.includes('photo') || text.includes('capture') || text.includes('take')) {
-            announceTTS("Taking photo");
-            triggerCapture();
-        } else if (text.includes('next') || text.includes('continue')) {
-            announceTTS("Next step");
-            triggerNextStep();
-        } else if (text.includes('previous') || text.includes('back') || text.includes('return')) {
-            announceTTS("Returning to previous step");
-            triggerPrevStep();
-        } else if (text.includes('repeat') || text.includes('instruction')) {
-            triggerRepeatInstruction();
-        } else if (text.includes('summary') || text.includes('status')) {
-            triggerShowSummary();
-        } else {
-            announceTTS("Command not recognized. Try: photo, next, back, or repeat.");
-        }
     }
 
     // Core TTS announcer
@@ -119,25 +100,33 @@ const FieldOpsVoiceConductor = (function() {
         }
     }
 
-    // Mock command simulation
+    // Mock dictation simulation
     function simulateVoiceCommand() {
-        const mockCommands = [
-            "take photo",
-            "next step",
-            "repeat instruction",
-            "installation summary"
+        const mockDictations = [
+            "routing is completed",
+            "optical power level is minus twenty",
+            "override bend radius restriction",
+            "no optical bend defects visible"
         ];
-        // Select random command
-        const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
-        voicePrompt.textContent = `Listening: "${randomCommand}" (Simulated)`;
+        const randomText = mockDictations[Math.floor(Math.random() * mockDictations.length)];
+        voicePrompt.textContent = `Listening: "${randomText}" (Simulated)`;
         btnVoiceAgent.className = 'btn-voice active';
         voiceWaves.classList.add('active');
         
         setTimeout(() => {
             btnVoiceAgent.className = 'btn-voice inactive';
             voiceWaves.classList.remove('active');
-            voicePrompt.textContent = "Hold mic button to talk...";
-            processVoiceCommand(randomCommand);
+            voicePrompt.textContent = "Hold mic button to dictate...";
+            
+            const chatInput = document.getElementById('chat-text-input');
+            if (chatInput) {
+                if (chatInput.value) {
+                    chatInput.value += " " + randomText;
+                } else {
+                    chatInput.value = randomText;
+                }
+                chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }, 1500);
     }
 

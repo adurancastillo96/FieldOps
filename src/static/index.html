@@ -38,10 +38,12 @@
             <!-- LEFT PANEL: Conversation and Chat Feed (Claude-like chat) -->
             <section class="panel-card chat-panel">
                 <div class="panel-header">
-                    <h2>💬 Live Assistant</h2>
+                    <h2>💬 Documentation Assistant</h2>
                     <div class="mode-selector">
-                        <button class="btn btn-secondary btn-xs active" id="btn-mode-offline">Offline Conductor</button>
-                        <button class="btn btn-secondary btn-xs" id="btn-mode-online">Live Agent (Cloud)</button>
+                        <span class="badge" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); padding: 4px 10px; border-radius: 99px; font-size: 0.8rem; font-weight: 600;">Guided Audit Mode</span>
+                        <!-- Retained hidden elements to keep compatibility with app.js -->
+                        <button id="btn-mode-offline" class="hidden" style="display:none;"></button>
+                        <button id="btn-mode-online" class="hidden" style="display:none;"></button>
                     </div>
                 </div>
                 
@@ -84,46 +86,57 @@
             <section class="panel-card multipurpose-panel">
                 <!-- Tab headers -->
                 <div class="tab-bar">
-                    <button class="tab-btn active" data-tab="camera-tab">📷 Camera</button>
-                    <button class="tab-btn" data-tab="photo-tab">🖼️ Captured Photo</button>
-                    <button class="tab-btn" data-tab="map-tab">🗺️ Deployment Map</button>
-                    <button class="tab-btn" data-tab="wo-tab">📋 Work Orders</button>
-                    <button class="tab-btn" data-tab="supervisor-tab">📊 Supervisor</button>
+                    <button class="tab-btn active" data-tab="camera-tab">📷 Camera / Upload</button>
+                    <button class="tab-btn" data-tab="photo-tab">🖼️ Photo Preview</button>
+                    <button class="tab-btn" data-tab="map-tab">🗺️ Route Map</button>
+                    <button class="tab-btn" data-tab="wo-tab">📋 Audit Verdicts</button>
+                    <button class="tab-btn" data-tab="supervisor-tab">📄 Markdown Report</button>
                 </div>
                 
                 <div class="tab-contents-container">
                     
-                    <!-- Tab 1: Live Camera viewfinder & edge QA -->
+                    <!-- Tab 1: Camera & File Upload -->
                     <div class="tab-content active" id="camera-tab">
                         <div class="panel-header-sub">
-                            <h3>Camera view</h3>
+                            <h3>Camera & Photo Upload</h3>
                             <span id="active-step-title" class="active-step-title">No active step</span>
                         </div>
                         <div class="tab-body camera-tab-body">
-                            <div class="viewfinder-container">
-                                <video id="viewfinder" autoplay playsinline muted class="viewfinder"></video>
-                                <canvas id="viewfinder-canvas" class="viewfinder-canvas hidden"></canvas>
+                            <!-- Drag and drop uploader dropzone -->
+                            <div class="uploader-container" style="margin-bottom: 15px;">
+                                <div class="drag-drop-zone" id="drag-drop-zone" style="border: 2px dashed var(--border-color); border-radius: 12px; padding: 30px; text-align: center; background: rgba(255, 255, 255, 0.02); cursor: pointer; transition: background 0.3s, border-color 0.3s;">
+                                    <span class="upload-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px; animation: bounce 2s infinite;">📤</span>
+                                    <p style="margin: 5px 0; font-size: 1rem; color: var(--color-text-primary);">Drag & drop photo here or <span class="browse-link" style="color: var(--accent-cyan); text-decoration: underline; font-weight: 600;">browse files</span></p>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Supports PNG, JPG, JPEG files</p>
+                                    <input type="file" id="file-uploader" accept="image/*" style="display: none;">
+                                </div>
+                            </div>
+
+                            <div class="viewfinder-container hidden" id="viewfinder-container" style="position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: #000; aspect-ratio: 4/3; max-height: 280px; margin-bottom: 15px;">
+                                <video id="viewfinder" autoplay playsinline muted class="viewfinder" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                <canvas id="viewfinder-canvas" class="viewfinder-canvas hidden" style="position: absolute; top:0; left:0; width:100%; height:100%;"></canvas>
                                 
                                 <!-- Guide box overlays -->
-                                <div class="camera-guideline" id="camera-guideline">
-                                    <div class="guideline-box"></div>
+                                <div class="camera-guideline" id="camera-guideline" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+                                    <div class="guideline-box" style="border: 2px dashed var(--accent-cyan); width: 70%; height: 60%; border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);"></div>
                                 </div>
 
-                                <div class="capture-overlay" id="capture-overlay">
-                                    <span class="overlay-instruction">Align device inside guidelines box</span>
+                                <div class="capture-overlay" id="capture-overlay" style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; pointer-events: none;">
+                                    <span class="overlay-instruction" style="background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Align device inside guidelines box</span>
                                 </div>
                             </div>
 
-                            <div class="camera-controls">
-                                <button class="btn btn-primary btn-lg btn-round" id="btn-capture" disabled>
-                                    📸 Capture Photo
+                            <div class="camera-controls" style="display: flex; gap: 10px; justify-content: center; margin-bottom: 15px;">
+                                <button class="btn btn-secondary" id="btn-toggle-camera" style="border-radius: 99px;">📷 Toggle Camera</button>
+                                <button class="btn btn-primary btn-round hidden" id="btn-capture" disabled style="padding: 10px 20px;">
+                                    📸 Take Snapshot
                                 </button>
-                                <button class="btn btn-secondary btn-lg btn-round hidden" id="btn-retake">
-                                    🔄 Retake
+                                <button class="btn btn-secondary btn-round hidden" id="btn-retake" style="padding: 10px 20px;">
+                                    🔄 Reset
                                 </button>
                             </div>
 
-                            <!-- Edge QA Results -->
+                            <!-- Edge QA Results (Retained but hidden by default) -->
                             <div class="qa-results-container hidden" id="qa-results-container">
                                 <h4>Quality Results (Edge AI)</h4>
                                 <div class="qa-grid">
@@ -144,12 +157,12 @@
                             </div>
                             
                             <!-- OCR extraction verification block -->
-                            <div class="ocr-verification-box hidden" id="ocr-verification-box">
+                            <div class="ocr-verification-box hidden" id="ocr-verification-box" style="margin-top: 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
                                 <h3>MAC & Serial Scan Verification</h3>
-                                <div class="form-group">
-                                    <label for="mac-input">Extracted MAC Address:</label>
-                                    <input type="text" id="mac-input" class="form-control font-mono" placeholder="XX:XX:XX:XX:XX:XX">
-                                    <span class="help-text" id="mac-prefix-warning"></span>
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="mac-input" style="display: block; margin-bottom: 5px; font-weight: 600;">Extracted MAC Address:</label>
+                                    <input type="text" id="mac-input" class="form-control font-mono" placeholder="XX:XX:XX:XX:XX:XX" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff;">
+                                    <span class="help-text" id="mac-prefix-warning" style="display: block; font-size: 0.8rem; margin-top: 5px; color: var(--accent-yellow);"></span>
                                 </div>
                                 <button class="btn btn-secondary btn-sm" id="btn-confirm-ocr">Confirm Data</button>
                             </div>
@@ -159,12 +172,12 @@
                     <!-- Tab 2: Captured step photo viewer -->
                     <div class="tab-content" id="photo-tab">
                         <div class="panel-header-sub">
-                            <h3>Captured step evidence</h3>
+                            <h3>Photo Preview</h3>
                         </div>
                         <div class="tab-body photo-tab-body">
                             <div class="photo-viewer-container" id="photo-viewer-container">
                                 <div class="photo-placeholder" id="photo-viewer-placeholder">
-                                    <span>No evidence captured for the current step yet. Complete camera capture to view.</span>
+                                    <span>No evidence captured or uploaded for the current step yet. Upload a photo or use the camera to view.</span>
                                 </div>
                                 <img id="photo-viewer-img" class="photo-viewer-img hidden" src="" alt="Captured step evidence">
                             </div>
@@ -177,7 +190,7 @@
                     <!-- Tab 3: Google Maps deployment route view -->
                     <div class="tab-content" id="map-tab">
                         <div class="panel-header-sub">
-                            <h3>Deployment Route Map</h3>
+                            <h3>Route Map</h3>
                             <span class="map-label">Google Maps Simulated API</span>
                         </div>
                         <div class="tab-body map-tab-body">
@@ -206,18 +219,17 @@
                         </div>
                     </div>
 
-                    <!-- Tab 4: Work order management, steps, sync status -->
+                    <!-- Tab 4: Work order management & Audit Verdicts -->
                     <div class="tab-content" id="wo-tab">
-                        <!-- Retained IDs for compatibility with app.js selectors -->
                         <div class="tab-body wo-tab-body scrollable" id="auditor-panel">
-                            <div class="wo-select-container">
-                                <label for="wo-select">Select Work Order:</label>
-                                <select id="wo-select" class="form-select">
+                            <div class="wo-select-container" style="margin-bottom: 15px;">
+                                <label for="wo-select" style="display: block; margin-bottom: 5px; font-weight: 600;">Select Work Order:</label>
+                                <select id="wo-select" class="form-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff;">
                                     <option value="">-- Load work order --</option>
                                 </select>
                             </div>
 
-                            <div id="wo-details-card" class="wo-details-card hidden">
+                            <div id="wo-details-card" class="wo-details-card hidden" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                                 <div class="wo-info-row">
                                     <span class="label">Address:</span>
                                     <span class="value" id="wo-address">-</span>
@@ -233,22 +245,22 @@
                             </div>
 
                             <!-- Steps Timeline -->
-                            <div class="workflow-steps-container">
+                            <div class="workflow-steps-container" style="margin-bottom: 15px;">
                                 <h3>Inspection steps timeline</h3>
                                 <div class="steps-timeline" id="steps-timeline">
                                     <div class="step-placeholder">Select a work order to see the inspection steps timeline.</div>
                                 </div>
                             </div>
 
-                            <div class="audit-status-container">
-                                <div class="overall-verdict-badge status-pending" id="overall-verdict">
+                            <div class="audit-status-container" style="margin-bottom: 15px; text-align: center;">
+                                <div class="overall-verdict-badge status-pending" id="overall-verdict" style="display: inline-block; padding: 10px 20px; border-radius: 8px; font-weight: 800; font-size: 1.1rem;">
                                     PENDING
                                 </div>
-                                <p class="verdict-desc" id="verdict-desc">Complete all work order steps to trigger cloud audit verification.</p>
+                                <p class="verdict-desc" id="verdict-desc" style="margin-top: 8px; font-size: 0.9rem; color: var(--color-text-secondary);">Complete all work order steps to trigger cloud audit verification.</p>
                             </div>
 
                             <!-- Database Persistence State -->
-                            <div class="persistence-card">
+                            <div class="persistence-card" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                                 <h3>Persistence Status</h3>
                                 <div class="sync-row">
                                     <span class="sync-label">Local Storage (IndexedDB):</span>
@@ -272,42 +284,29 @@
                         </div>
                     </div>
 
-                    <!-- Tab 5: Supervisor dashboard -->
+                    <!-- Tab 5: Markdown Report -->
                     <div class="tab-content" id="supervisor-tab">
-                        <!-- Retained IDs for compatibility with app.js selectors -->
-                        <div class="tab-body supervisor-tab-body scrollable" id="supervisor-panel">
-                            <div class="metrics-grid">
-                                <div class="metric-card">
-                                    <span class="metric-val" id="metric-total">0</span>
-                                    <span class="metric-label">Installations</span>
-                                </div>
-                                <div class="metric-card">
-                                    <span class="metric-val" id="metric-rate">0%</span>
-                                    <span class="metric-label">Approval rate</span>
-                                </div>
-                                <div class="metric-card">
-                                    <span class="metric-val" id="metric-mismatches">0</span>
-                                    <span class="metric-label">MAC Mismatches</span>
-                                </div>
-                                <div class="metric-card">
-                                    <span class="metric-val" id="metric-power">0 dBm</span>
-                                    <span class="metric-label">Avg Power Level</span>
-                                </div>
+                        <div class="tab-body supervisor-tab-body scrollable" style="padding: 15px;">
+                            <div class="panel-header-sub" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3>Generated Markdown Report</h3>
+                                <button class="btn btn-primary btn-sm" id="btn-download-report" style="padding: 8px 15px;" disabled>💾 Download Markdown</button>
+                            </div>
+                            <div class="markdown-preview-container" style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; max-height: calc(100vh - 250px); overflow-y: auto;">
+                                <div id="report-preview" style="font-family: var(--font-mono); white-space: pre-wrap; font-size: 0.85rem; color: var(--color-text-primary); line-height: 1.5;">Select a work order and complete the steps to generate the installation report.</div>
                             </div>
                             
-                            <div class="analytics-input-container">
-                                <h3>💬 Conversational Analytics Assistant</h3>
-                                <div class="form-group">
-                                    <input type="text" id="analytics-input" class="form-control" placeholder="Ask: 'How many approved today?' or 'show average power'">
-                                </div>
-                                <button class="btn btn-primary btn-sm" id="btn-ask-analytics">Submit Inquiry</button>
-                            </div>
-
-                            <div class="sql-result-container hidden" id="sql-result-container">
-                                <h3>Generated SQL Query</h3>
-                                <pre id="sql-query-display" class="sql-query-display"></pre>
-                                <h3>Execution Output</h3>
-                                <pre id="sql-data-display" class="sql-data-display"></pre>
+                            <!-- Retained elements hidden to keep compatibility with app.js selectors -->
+                            <div class="hidden-compat-selectors" style="display: none;">
+                                <div id="supervisor-panel"></div>
+                                <span id="metric-total">0</span>
+                                <span id="metric-rate">0%</span>
+                                <span id="metric-mismatches">0</span>
+                                <span id="metric-power">0 dBm</span>
+                                <input type="text" id="analytics-input" value="">
+                                <button id="btn-ask-analytics"></button>
+                                <div id="sql-result-container"></div>
+                                <pre id="sql-query-display"></pre>
+                                <pre id="sql-data-display"></pre>
                             </div>
                         </div>
                     </div>
