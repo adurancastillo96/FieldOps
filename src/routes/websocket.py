@@ -167,8 +167,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                             }))
                         _user_said = ""
                         _agent_said = ""
-            except (ValueError, KeyError, TypeError) as exc:
-                logger.warning("Recoverable live error: %s", exc)
+            except Exception as exc:
+                logger.error("Error in live flow: %s", exc, exc_info=True)
                 try:
                     await websocket.send_text(json.dumps({
                         "type": "error",
@@ -194,5 +194,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
             task.cancel()
             try:
                 await task
-            except asyncio.CancelledError:
+            except Exception:
                 pass
+        # CRITICAL: always close the queue to prevent zombie Vertex AI sessions
+        # that would count against the concurrent session quota.
+        live_request_queue.close()
+        logger.info("Session closed: %s", session_id)
+        try:
+            await websocket.close()
+        except Exception:
+            pass
