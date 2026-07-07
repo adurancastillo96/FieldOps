@@ -680,6 +680,15 @@ const FieldOpsApp = (function() {
             });
         }
 
+        // Attach file button click listener
+        const btnAttachFile = document.getElementById('btn-attach-file');
+        if (btnAttachFile && fileUploader) {
+            btnAttachFile.addEventListener('click', (e) => {
+                e.preventDefault();
+                fileUploader.click();
+            });
+        }
+
         // Download report button handler
         const btnDownload = document.getElementById('btn-download-report');
         if (btnDownload) {
@@ -988,6 +997,13 @@ const FieldOpsApp = (function() {
     async function uploadStepPhoto(base64Image) {
         if (!currentInspection) return;
         const activeStep = INSPECTION_STEPS[activeStepIdx];
+        
+        // Display uploaded photo in chat dialogue!
+        const imgBubble = document.createElement('div');
+        imgBubble.className = `transcript-bubble user photo-bubble`;
+        imgBubble.innerHTML = `<img src="${base64Image}" style="max-width: 250px; border-radius: 8px; border: 1px solid var(--border-color); display: block;" alt="Uploaded step photo">`;
+        dialogueContainer.appendChild(imgBubble);
+        dialogueContainer.scrollTop = dialogueContainer.scrollHeight;
         
         appendDialogue('agent', `Analyzing photo for ${activeStep.name}...`);
         

@@ -135,8 +135,12 @@ body {
 }
 
 .main-layout.claude-layout {
-    grid-template-columns: 420px 1fr;
-    height: calc(100vh - 75px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    height: calc(100vh - 60px);
+    overflow: hidden;
 }
 
 /* Claude Layout and Tab Controls */
@@ -1170,3 +1174,58 @@ body {
     max-height: 200px;
     overflow-y: auto;
 }
+
+/* Chatbot UI Enhancements */
+.btn-attach:hover {
+    color: var(--accent-cyan) !important;
+    transform: scale(1.15);
+}
+
+.photo-bubble {
+    padding: 6px !important;
+    background: transparent !important;
+    border: none !important;
+    align-self: flex-end;
+}
+
+.photo-bubble img {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s ease;
+    cursor: zoom-in;
+}
+
+.photo-bubble img:hover {
+    transform: scale(1.02);
+}
+
+/* Make dialogue container scroll beautifully */
+.dialogue-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dialogue-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dialogue-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+.dialogue-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Form Select Styling */
+.form-select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 10px 10px;
+    padding-right: 2rem !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
