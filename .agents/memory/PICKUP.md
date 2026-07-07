@@ -6,14 +6,13 @@ Current state at the end of the last session.
 **Active Branch:** main
 
 ## Last Status
-- Completed: Removed the visual tabs ("📷 Camera / Upload", "🖼️ Photo Preview", "🗺️ Route Map", "📋 Audit Verdicts", "📄 Markdown Report") to establish a simplified, single-column chatbot-first user interface.
-- Coded: Enabled inline file attach `📎` trigger, dropzone uploads, dynamic in-conversation user photo bubble previews, and integrated global header Work Order and Report Download buttons.
-- Compatibility: Preserved all DOM element references within a hidden container, maintaining backward compatibility for the API, Speech Conductor, and test verifications.
+- Completed: Simplification of UI-UX layout (retaining only the global header and full-screen chatbot panel).
+- Coded: Allowed Vertex AI ADC client initialization (by not passing empty api_keys), enabling cloud integration when `GOOGLE_GENAI_USE_VERTEXAI` is active.
+- Verification: Wrapped all cloud vision and analytics requests in exception try-blocks to automatically trigger local heuristic/mock fallbacks if GCP APIs are disabled, enabling offline or unconfigured local execution.
 
 ## Next Steps
-1. Verify report download triggers upon walkthrough completion.
-2. Confirm uvicorn remains active on port 8000.
+1. Guide user to verify cloud or local mock execution status on browser load.
 
 ## Important Context
 - All 59 unit tests are passing successfully.
-- Background uvicorn process is running correctly.
+- Background server task is active on port 8000.
