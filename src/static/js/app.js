@@ -541,7 +541,7 @@ const FieldOpsApp = (function() {
     }
 
     // Local heuristic analyzer for offline text message inputs
-    function simulateOfflineTextCommand(text) {
+    async function simulateOfflineTextCommand(text) {
         const q = text.toLowerCase().trim();
         if (q.includes('photo') || q.includes('capture') || q.includes('take')) {
             FieldOpsVoiceConductor.announce("Taking photo");
@@ -563,9 +563,55 @@ const FieldOpsApp = (function() {
             if (jsonPre) {
                 appendDialogue('agent', `Audit report payload:\n${jsonPre.textContent}`);
             }
+        } else if (q.includes('override') || q.includes('justify') || q.includes('space') || q.includes('limit') || q.includes('cabinet') || q.includes('restrict')) {
+            // Local fallback override implementation
+            const activeStep = INSPECTION_STEPS[activeStepIdx];
+            const stepRecord = await FieldOpsStorage.getStep(currentInspection.id, activeStep.id);
+            const justification = text;
+            
+            const stepData = {
+                id: `${currentInspection.id}_${activeStep.id}`,
+                inspection_id: currentInspection.id,
+                step_id: activeStep.id,
+                evidence_type: 'photo',
+                image_url: stepRecord ? stepRecord.image_url : null,
+                image_data: stepRecord ? stepRecord.image_data : null,
+                ocr_value: stepRecord ? stepRecord.ocr_value : null,
+                serial_number: stepRecord ? stepRecord.serial_number : null,
+                optical_power_dbm: stepRecord ? stepRecord.optical_power_dbm : null,
+                quality_blur: 'pass',
+                quality_exposure: 'pass',
+                quality_framing: 'pass',
+                compliance_verdict: 'pass',
+                compliance_justification: `Overridden (Offline): ${justification}`
+            };
+            await FieldOpsStorage.saveStep(stepData);
+            
+            appendDialogue('agent', `[Offline Mode] Registered justification: "${justification}". Step marked as completed with deviation.`);
+            FieldOpsVoiceConductor.announce("Step overridden.");
+            
+            await renderSteps();
+            await updatePhotoViewerForCurrentStep();
+            
+            setTimeout(async () => {
+                if (activeStepIdx < INSPECTION_STEPS.length - 1) {
+                    activeStepIdx++;
+                    await renderSteps();
+                    await updatePhotoViewerForCurrentStep();
+                    const nextMsg = `Next step: ${INSPECTION_STEPS[activeStepIdx].name}. ${INSPECTION_STEPS[activeStepIdx].desc}`;
+                    appendDialogue('agent', nextMsg);
+                    FieldOpsVoiceConductor.announce(nextMsg);
+                } else {
+                    await renderSteps();
+                    await updatePhotoViewerForCurrentStep();
+                    appendDialogue('agent', "All steps completed! Check the Markdown Report tab to download your installation report.");
+                    FieldOpsVoiceConductor.announce("All steps completed.");
+                    await finalizeInspection();
+                }
+            }, 1500);
         } else {
             setTimeout(() => {
-                appendDialogue('agent', "Command not recognized offline. Try: 'take photo', 'next step', 'back', 'repeat instruction', or switch to Live Agent mode.");
+                appendDialogue('agent', "Command not recognized offline. Try: 'take photo', 'next step', 'back', 'repeat instruction', or describe a cabinet/space limit to override.");
             }, 800);
         }
     }
@@ -1031,7 +1077,7 @@ const FieldOpsApp = (function() {
             }
         } catch (error) {
             console.error("Error uploading photo:", error);
-            appendDialogue('agent', `❌ Photo upload failed due to a connection error. Please try again.`);
+            appendDialogue('agent', `❌ Photo upload failed: ${error.message}. Please try again.`);
         }
     }
 

@@ -74,7 +74,7 @@ const FieldOpsVoiceConductor = (function() {
             // Cancel current announcements
             window.speechSynthesis.cancel();
             
-            const utterance = new SpeechUtterance(message);
+            const utterance = new SpeechSynthesisUtterance(message);
             utterance.lang = 'en-US';
             window.speechSynthesis.speak(utterance);
         }
