@@ -35,10 +35,13 @@ def generate_analytics_sql(question: str) -> str:
     Translates a natural language question (Spanish) into a Google BigQuery SQL query.
     Uses Gemini API model to generate compliant SQL code blocks.
     """
+    use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI") in ("1", "true", "TRUE")
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    has_gcp_auth = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"))
+    
+    if not (api_key or use_vertex or has_gcp_auth):
         # Static offline heuristic translator if API Key is not set
-        logger.warning("GEMINI_API_KEY not found. Using local heuristic translator.")
+        logger.warning("GenAI cloud credentials not found. Using local heuristic translator.")
         q = question.lower()
         if any(w in q for w in ["fall", "rechaz", "fail", "reject"]):
             return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger` WHERE overall_verdict = 'rejected'"
@@ -50,7 +53,12 @@ def generate_analytics_sql(question: str) -> str:
             return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger`"
 
     try:
-        client = genai.Client(api_key=api_key)
+        if use_vertex:
+            client = genai.Client()
+        elif api_key:
+            client = genai.Client(api_key=api_key)
+        else:
+            client = genai.Client()
         prompt = (
             f"You are the Conversational Analytics Agent for FieldOps.\n"
             f"Given the following BigQuery table schema:\n{BQ_SCHEMA_PROMPT}\n\n"
@@ -65,8 +73,16 @@ def generate_analytics_sql(question: str) -> str:
         sql = response.text.replace("```sql", "").replace("```", "").strip()
         return sql
     except Exception as e:
-        logger.error(f"Failed to generate SQL via Gemini: {str(e)}")
-        return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger`"
+        logger.error(f"Failed to generate SQL via Gemini: {str(e)}. Falling back to local heuristics.")
+        q = question.lower()
+        if any(w in q for w in ["fall", "rechaz", "fail", "reject"]):
+            return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger` WHERE overall_verdict = 'rejected'"
+        elif any(w in q for w in ["aprob", "approv", "pass"]):
+            return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger` WHERE overall_verdict = 'approved'"
+        elif any(w in q for w in ["potencia", "power", "dbm"]):
+            return "SELECT AVG(step.optical_power_dbm) FROM `fieldops_dataset.inspection_ledger`, UNNEST(steps) as step WHERE step.step_id = 'power-meter'"
+        else:
+            return "SELECT COUNT(*) FROM `fieldops_dataset.inspection_ledger`"
 
 def execute_mock_sql_query(sql_query: str) -> list:
     """

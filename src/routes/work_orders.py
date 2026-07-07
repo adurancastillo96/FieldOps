@@ -113,11 +113,14 @@ class ChatRequest(BaseModel):
 def run_gemini_vision_audit(step_id: str, file_bytes: bytes, work_order_id: str, force_mock: bool = False) -> dict:
     """
     Executes standard Gemini Vision defect checking.
-    Falls back to mock responses if GEMINI_API_KEY is not set.
+    Falls back to mock responses if GenAI cloud credentials are not set.
     """
+    use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI") in ("1", "true", "TRUE")
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key or api_key == "PLACEHOLDER" or force_mock:
-        logger.warning("GEMINI_API_KEY not configured or force mock active. Running offline visual defect simulation.")
+    has_gcp_auth = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"))
+    
+    if force_mock or not (api_key or use_vertex or has_gcp_auth) or api_key == "PLACEHOLDER":
+        logger.warning("GenAI cloud credentials not configured or force mock active. Running offline visual defect simulation.")
         # Simulation Mock logic
         if step_id == "bend_radius":
             return {
@@ -167,7 +170,12 @@ def run_gemini_vision_audit(step_id: str, file_bytes: bytes, work_order_id: str,
         from google import genai
         from google.genai import types
         
-        client = genai.Client(api_key=api_key)
+        if use_vertex:
+            client = genai.Client()
+        elif api_key:
+            client = genai.Client(api_key=api_key)
+        else:
+            client = genai.Client()
         image_part = types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg")
         
         prompt = (
@@ -359,13 +367,21 @@ async def chat_assistant(
         }
 
     # Standard chat reply
+    use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI") in ("1", "true", "TRUE")
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    has_gcp_auth = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"))
+    
+    if not (api_key or use_vertex or has_gcp_auth):
         reply = f"Thank you for the update. I am currently monitoring the {target_step} installation step. Please upload a clear photo or type/dictate an override request if there is a block."
     else:
         try:
             from google import genai
-            client = genai.Client(api_key=api_key)
+            if use_vertex:
+                client = genai.Client()
+            elif api_key:
+                client = genai.Client(api_key=api_key)
+            else:
+                client = genai.Client()
             prompt = (
                 f"You are the FieldOps installation assistant. The technician is checking step: {target_step}.\n"
                 f"The technician says: \"{message}\"\n"
