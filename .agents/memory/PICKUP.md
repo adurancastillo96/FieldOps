@@ -6,14 +6,14 @@ Current state at the end of the last session.
 **Active Branch:** main
 
 ## Last Status
-- Completed: T012 through T018 (REST Photo Audit & Speech).
-- Reverted: Simplified chatbot-only layout refactoring. Restored the original dual-pane Claude-style UI-UX layout (left chat feed, right tabs for Camera, Previews, Maps, Verdicts, Reports).
-- Coded & Tested: Fixed `SpeechSynthesisUtterance` constructor class name typo in `voice-conductor.js`, and added robust offline override keyword recognition to `app.js` to ensure zero connection/dictation crashes.
+- Completed: Removed the visual tabs ("📷 Camera / Upload", "🖼️ Photo Preview", "🗺️ Route Map", "📋 Audit Verdicts", "📄 Markdown Report") to establish a simplified, single-column chatbot-first user interface.
+- Coded: Enabled inline file attach `📎` trigger, dropzone uploads, dynamic in-conversation user photo bubble previews, and integrated global header Work Order and Report Download buttons.
+- Compatibility: Preserved all DOM element references within a hidden container, maintaining backward compatibility for the API, Speech Conductor, and test verifications.
 
 ## Next Steps
-1. Inform the user that the original Claude-style layout is fully active and restored.
-2. Confirm uvicorn is serving the app.
+1. Verify report download triggers upon walkthrough completion.
+2. Confirm uvicorn remains active on port 8000.
 
 ## Important Context
 - All 59 unit tests are passing successfully.
-- Local dev server is running on port 8000 and confirmed healthy.
+- Background uvicorn process is running correctly.
